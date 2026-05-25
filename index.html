@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Abriendo despiece…</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #f5f5f5;
+      color: #444;
+    }
+    p { font-size: 1.1rem; margin: 0.4rem 0; }
+    #aviso { color: #c00; font-size: 0.9rem; display: none; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <p>Abriendo Despieces Presenti…</p>
+  <p id="aviso">
+    Si no se abre, asegúrate de que la aplicación está instalada y vuélvelo a intentar.
+  </p>
+
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var id = parseInt(params.get("id"), 10);
+
+    if (id > 0) {
+      window.location.href = "despieces://open/" + id;
+      setTimeout(function () {
+        document.getElementById("aviso").style.display = "block";
+      }, 1500);
+    } else {
+      document.querySelector("p").textContent = "Enlace no válido.";
+    }
+  </script>
+</body>
+</html>
