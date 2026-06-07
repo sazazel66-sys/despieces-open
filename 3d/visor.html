@@ -271,9 +271,9 @@ for (const p of MODELO.piezas){
   //   cazoleta en U (curva) + pala alta + espiga inferior que entra en la puerta.
   //   Cotas (cm): ancho 1,6 · alto pala 3,5 · chapa 0,15 · cazoleta Ø1,5 (r 0,75)
   if (p.forma === "unero"){
-    // Bajado JUNTA_FRENTE para que el remate del perfil coincida con el top que
-    // tendría el frente con tirador de asa (frente+uñero = misma altura total).
-    const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE;
+    // Bajado JUNTA_FRENTE + 0,8 (afinado a ojo con el usuario) para que el perfil
+    // y la franja delantera del frente queden 0,8 cm más bajos a la vez.
+    const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE - 0.8;
     const Cu = 0.85, Cv = 0.85;              // centro de la cazoleta (u,v) en cm
     const Ri = 0.60, vTop = 3.5;             // radio interior (hueco dedo) · alto pala
     const vBase = 0.10;                      // base plana = top de la puerta (rellena huecos)
@@ -309,7 +309,7 @@ for (const p of MODELO.piezas){
   if (p.frente && TIPO_TIRADOR === "unero"){
     const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
     const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
-    const altoDel = altoTras + 1.3;                    // delante: sobresale 1,3 cm sobre la trasera
+    const altoDel = altoTras + 0.5;                    // delante: sobresale 0,5 cm sobre la trasera
     const matF = new THREE.MeshStandardMaterial({
       color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
     // Sección en plano (a=profundidad 0..sz, b=altura): L con escalón en a=fDel
