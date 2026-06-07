@@ -36,15 +36,22 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 //  Vamos sobrescribiendo este objeto a medida que añadimos piezas.
 // ───────────────────────────────────────────────────────────────────────────
 const MODELO = {
-  nombre: "Bajo cajones (en construcción)",
-  nota: "Caja incompleta: 2 costados + suelo + techo · 50 × 73,5 × 50 cm",
+  nombre: "Bajo cajones",
+  nota: "Cacerolero: 2 cajones grandes + cubertero · 50 × 73,5 × 50 cm",
   color: "#caa86b",          // color tabla por defecto
   canto: "#5a4a2e",          // color de aristas
   piezas: [
+    // ── Caja ──────────────────────────────────────────────
     { nombre:"Costado Izq", pos:[0,    0,    0], size:[1.9, 73.5, 50] },
     { nombre:"Costado Der", pos:[48.1, 0,    0], size:[1.9, 73.5, 50] },
     { nombre:"Suelo",       pos:[1.9,  0,    0], size:[46.2, 1.9, 50] },
-    { nombre:"Techo",       pos:[1.9,  71.6, 0], size:[46.2, 1.9, 50] }
+    { nombre:"Techo",       pos:[1.9,  71.6, 0], size:[46.2, 1.9, 50] },
+    // ── Trasera (encajada a 5 cm del fondo) ───────────────
+    { nombre:"Trasera",     pos:[1.9,  1.9,  45], size:[46.2, 69.7, 0.5], color:"#b89a5e" },
+    // ── Frentes de cajones (cerrados, sobresalen 1,9 cm) ──
+    { nombre:"Frente cajón inferior", pos:[0.2, 0.2,  -1.9], size:[49.6, 29.25, 1.9], color:"#d8b878" },
+    { nombre:"Frente cajón medio",    pos:[0.2, 29.75, -1.9], size:[49.6, 29.25, 1.9], color:"#d8b878" },
+    { nombre:"Frente cubertero",      pos:[0.2, 59.3,  -1.9], size:[49.6, 14.0,  1.9], color:"#d8b878" }
   ]
 };
 
