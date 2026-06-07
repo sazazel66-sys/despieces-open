@@ -275,16 +275,19 @@ for (const p of MODELO.piezas){
     // tendría el frente con tirador de asa (frente+uñero = misma altura total).
     const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE;
     const Cu = 0.85, Cv = 0.85;              // centro de la cazoleta (u,v) en cm
-    const Ro = 0.75, Ri = 0.60, vTop = 3.5;  // radios exterior/interior · alto pala
-    // Contorno de la chapa (banda fina): pala dcha (front) → cazoleta U → pala izq
+    const Ri = 0.60, vTop = 3.5;             // radio interior (hueco dedo) · alto pala
+    const vBase = 0.10;                      // base plana = top de la puerta (rellena huecos)
+    // Contorno MACIZO: base plana abajo (apoya en toda la línea de la puerta) y un
+    // único hueco redondo arriba para los dedos. Así no quedan huecos a los lados
+    // del radio (la cazoleta exterior ya no es un semicírculo que toca en un punto).
     const sh = new THREE.Shape();
     sh.moveTo(1.60, vTop);                    // pala (alta), borde frontal-exterior
-    sh.lineTo(1.60, Cv);                      // baja por el exterior hasta la cazoleta
-    sh.absarc(Cu, Cv, Ro, 0, Math.PI, true);  // cazoleta exterior (semicírculo inferior)
-    sh.lineTo(0.10, 1.50);                    // sube por la pared izquierda corta
+    sh.lineTo(1.60, vBase);                   // baja todo el exterior hasta la base
+    sh.lineTo(0.10, vBase);                   // base plana (apoya sobre el top de la puerta)
+    sh.lineTo(0.10, 1.50);                    // sube por la pared izquierda exterior
     sh.absarc(0.175, 1.50, 0.075, Math.PI, 0, false); // labio redondeado izquierdo
     sh.lineTo(0.25, Cv);                      // baja por el interior de la pared izq
-    sh.absarc(Cu, Cv, Ri, Math.PI, 0, false); // cazoleta interior (semicírculo INFERIOR)
+    sh.absarc(Cu, Cv, Ri, Math.PI, 0, false); // hueco interior del dedo (semicírculo inferior)
     sh.lineTo(1.45, vTop);                    // sube por el interior de la pala
     sh.lineTo(1.60, vTop);                    // cierra el espesor en la punta
     const geo = new THREE.ExtrudeGeometry(sh,
