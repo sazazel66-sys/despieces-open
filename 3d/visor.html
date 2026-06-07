@@ -39,6 +39,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // ───────────────────────────────────────────────────────────────────────────
 //  MODELO DEL MUEBLE  (cm:  X = anchura,  Y = altura,  Z = fondo)
@@ -89,55 +90,37 @@ const MODELO = {
   ]
 };
 
-// Cuatro patas niveladoras de cocina; centro a `inset` cm de cada borde.
-// Cada pata = pie redondo + husillo roscado + casquillo + placa de fijación + clip.
+// Cuatro patas niveladoras de cocina (malla STL real); centro a `inset` cm.
+// Devuelve marcadores forma:"stl"; la malla se instancia en el bucle de piezas.
 function patasMueble(ancho, fondo, alto, inset = 7.5){
   const out = [];
   for (const x of [inset, ancho - inset])
     for (const z of [inset, fondo - inset])
-      out.push(...pataMueble(x, z, alto));
+      out.push({ nombre:"Pata", forma:"stl", base:true, alto, pos:[x, 0, z], size:[0,0,0] });
   return out;
 }
 
-// Una pata niveladora de cocina (tipo ABS/Häfele AXILO) centrada en (cx,cz).
-// Modelada para alto = 15,5 cm y escalada en Y con k = alto/15,5.
-//  ── pie redondo abombado · husillo roscado regulable · casquillo · placa
-//     de fijación cuadrada (se atornilla al suelo) · clip que entra en el taladro
-function pataMueble(cx, cz, alto){
-  const k = alto / 15.5;            // escala vertical
-  const negro = "#2c2e32";          // plástico ABS negro
-  const metal = "#9aa0a6";          // acero del husillo
-  const metalC = "#c2c6cc";         // brillo de la rosca
-  const P = [];
-  // cilindro centrado en (cx,cz): atajo
-  const cil = (nombre, y0, h, d, col, extra = {}) =>
-    P.push({ nombre, forma:"cilindro", base:true, sinCanto:true,
-             pos:[cx - d/2, y0, cz - d/2], size:[d, h, d], color:col,
-             rough:0.6, metal:0.15, ...extra });
-
-  // 1) pie de apoyo redondo (ligeramente cónico, más ancho abajo)
-  P.push({ nombre:"Pata · pie", forma:"cilindro", base:true, sinCanto:true,
-           rBot:3.0, rTop:2.5, pos:[cx - 3.0, 0, cz - 3.0], size:[6.0, 1.5*k, 6.0],
-           color:negro, rough:0.7 });
-
-  // 2) husillo roscado: núcleo de acero + anillos de rosca apilados
-  const yH = 1.5*k, hH = 9.0*k;
-  cil("Pata · husillo", yH, hH, 3.0, metal, { metal:0.55, rough:0.4, seg:16 });
-  for (let yr = yH + 0.4*k; yr < yH + hH - 0.4*k; yr += 0.72*k)
-    cil("Pata · rosca", yr, 0.34*k, 3.7, metalC, { metal:0.55, rough:0.35, seg:16 });
-
-  // 3) casquillo superior (donde el husillo enrosca en la placa)
-  cil("Pata · casquillo", (1.5 + 9.0)*k, 2.0*k, 4.2, negro, { rough:0.7 });
-
-  // 4) placa de fijación cuadrada (se atornilla al suelo del mueble)
-  P.push({ nombre:"Pata · placa", base:true, sinCanto:true,
-           pos:[cx - 4.0, (1.5 + 9.0 + 2.0)*k, cz - 4.0], size:[8.0, 1.6*k, 8.0],
-           color:negro, rough:0.7 });
-
-  // 5) clip/espiga que entra en el taladro a media madera del suelo
-  cil("Pata · clip", (1.5 + 9.0 + 2.0 + 1.6)*k, 0.9*k, 3.0, negro, { rough:0.7 });
-
-  return P;
+// Carga la malla STL de la pata, la orienta (pie abajo) y la normaliza:
+// minY = 0, centrada en X/Z, escalada uniformemente a `altoObjetivo` cm.
+// Devuelve la BufferGeometry lista para clonar, o null si falla la carga.
+async function cargarGeoPata(url, altoObjetivo){
+  try {
+    const geo = await new STLLoader().loadAsync(url);
+    geo.computeBoundingBox();
+    const b = geo.boundingBox;
+    const altoSTL = b.max.y - b.min.y;
+    const s = altoObjetivo / altoSTL;            // escala uniforme (no deforma)
+    // centrar en X/Z y apoyar la base en y=0, luego escalar
+    const cx = (b.min.x + b.max.x) / 2;
+    const cz = (b.min.z + b.max.z) / 2;
+    geo.translate(-cx, -b.min.y, -cz);
+    geo.scale(s, s, s);
+    geo.computeVertexNormals();
+    return geo;
+  } catch (e) {
+    console.warn("No se pudo cargar la pata STL:", e);
+    return null;
+  }
 }
 
 // Genera un tirador de asa centrado en X del mueble, a una altura Y dada.
@@ -193,10 +176,32 @@ const colTabla = new THREE.Color(MODELO.color || "#caa86b");
 const colCanto = new THREE.Color(MODELO.canto || "#5a4a2e");
 
 const elev = MODELO.elevacion || 0;     // las patas suben el cuerpo
+
+// Malla real de la pata (STL) — se clona en cada esquina; null si no carga
+const pataGeo = await cargarGeoPata("pata.stl", elev || 15.5);
+const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
+
 for (const p of MODELO.piezas){
   const [sx,sy,sz] = p.size;
   const [px,py,pz] = p.pos;
   const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
+
+  // ── Pata: instancia de la malla STL (apoyada en y=0, centrada en su pos) ──
+  if (p.forma === "stl"){
+    if (pataGeo){
+      const m = new THREE.Mesh(pataGeo, matPata);
+      m.position.set(px, 0, pz);         // pos = centro X/Z de la pata, base en y=0
+      grupo.add(m);
+    } else {                              // fallback: cilindro simple
+      const d = 5, h = p.alto || 15.5;
+      const fg = new THREE.CylinderGeometry(d/2, d/2, h, 20);
+      const fm = new THREE.Mesh(fg, matPata);
+      fm.position.set(px, h/2, pz);
+      grupo.add(fm);
+    }
+    continue;
+  }
+
   const geo = (p.forma === "cilindro")
     ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
     : new THREE.BoxGeometry(sx, sy, sz);
