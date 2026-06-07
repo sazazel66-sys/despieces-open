@@ -33,14 +33,20 @@ const MODELO = {
 - `color` por pieza es opcional; si falta usa `MODELO.color`.
 - El panel de **medidas** se muestra siempre a la derecha; incluir todas las cotas importantes.
 
-## 3. Colores estándar
+## 3. Aspecto / colores estándar
+
+Estilo **vista sombreada tipo Rhino** en blancos y grises (no alámbrico, no madera):
 
 | Elemento | Color |
 |----------|-------|
-| Tabla / carcasa | `#caa86b` |
-| Aristas (canto) | `#5a4a2e` |
-| Frentes (puertas/cajones) | `#d8b878` |
-| Trasera | `#b89a5e` |
+| Tabla / carcasa / frentes / trasera | `#d6d8db` (gris claro uniforme) |
+| Aristas (canto) | `#3a3d42` (gris oscuro fino) |
+| Fondo | degradado vertical `#fdfdfe` (arriba) → `#c7ccd2` (abajo) |
+
+- Material mate: `MeshStandardMaterial` `roughness 0.95`, `metalness 0`.
+- Luces neutras y suaves (hemisférica + ambiente + 2 direccionales) para sombreado uniforme.
+- Todas las piezas usan el mismo gris; **no** poner `color` por pieza salvo que se quiera resaltar algo. Las juntas (cajones/puertas) se ven por las aristas.
+- Cámara por defecto: vista frontal-superior-derecha con los **frentes hacia el espectador** (frentes en `-Z`, cámara en `-Z`).
 
 ## 4. Carcasa (caja) estándar
 

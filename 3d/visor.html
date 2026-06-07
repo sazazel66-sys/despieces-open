@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Visor 3D — Despieces Presenti</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#eef1f4;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#d5d9df;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}
   #c{display:block;width:100vw;height:100vh;touch-action:none}
   #info{position:fixed;top:10px;left:12px;color:#334;font-size:14px;font-weight:600;z-index:5;text-shadow:0 1px 2px #fff}
   #sub{position:fixed;top:30px;left:12px;color:#778;font-size:12px;z-index:5}
@@ -49,8 +49,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const MODELO = {
   nombre: "Bajo cajones",
   nota: "1 cajón pequeño (14) + 2 grandes (28) · 60 × 70 × 58 cm",
-  color: "#caa86b",          // color tabla por defecto
-  canto: "#5a4a2e",          // color de aristas
+  color: "#d6d8db",          // gris claro tipo "vista sombreada" (Rhino)
+  canto: "#3a3d42",          // aristas gris oscuro
   // Medidas que se muestran en el panel lateral (etiqueta → valor)
   medidas: [
     ["Alto total",      "70 cm"],
@@ -68,12 +68,12 @@ const MODELO = {
     { nombre:"Suelo",       pos:[1.9,  0,    0], size:[56.2, 1.9, 58] },
     { nombre:"Techo",       pos:[1.9,  68.1, 0], size:[56.2, 1.9, 58] },
     // ── Trasera (encajada a 5 cm del fondo) ───────────────
-    { nombre:"Trasera",     pos:[1.9,  1.9,  53], size:[56.2, 66.2, 0.5], color:"#b89a5e" },
+    { nombre:"Trasera",     pos:[1.9,  1.9,  53], size:[56.2, 66.2, 0.5] },
     // ── Frentes de cajones (cerrados, sobresalen 1,9 cm) ──
     //    de abajo arriba: grande 28 · grande 28 · pequeño 14
-    { nombre:"Frente cajón grande inferior", pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9], color:"#d8b878" },
-    { nombre:"Frente cajón grande medio",    pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9], color:"#d8b878" },
-    { nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9], color:"#d8b878" }
+    { nombre:"Frente cajón grande inferior", pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
+    { nombre:"Frente cajón grande medio",    pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
+    { nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] }
   ]
 };
 
@@ -83,17 +83,28 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xeef1f4);
+
+// Fondo degradado gris claro (estilo viewport sombreado de Rhino)
+(function(){
+  const cv = document.createElement('canvas'); cv.width = 2; cv.height = 256;
+  const g = cv.getContext('2d').createLinearGradient(0,0,0,256);
+  g.addColorStop(0, '#fdfdfe');   // arriba casi blanco
+  g.addColorStop(1, '#c7ccd2');   // abajo gris claro
+  const ctx = cv.getContext('2d'); ctx.fillStyle = g; ctx.fillRect(0,0,2,256);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = tex;
+})();
 
 const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 1, 5000);
 
-// Luces (sombreado de tablas)
-scene.add(new THREE.HemisphereLight(0xffffff, 0x9099a5, 0.95));
-const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-dir.position.set(1.2, 2.0, 1.6);
+// Luces neutras y suaves (sombreado uniforme tipo Rhino)
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb8bcc2, 1.05));
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const dir = new THREE.DirectionalLight(0xffffff, 0.65);
+dir.position.set(1.0, 1.8, 1.2);
 scene.add(dir);
-const dir2 = new THREE.DirectionalLight(0xffffff, 0.35);
-dir2.position.set(-1.5, 0.6, -1.0);
+const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
+dir2.position.set(-1.4, 0.8, -1.0);
 scene.add(dir2);
 
 // Construir piezas
@@ -107,7 +118,7 @@ for (const p of MODELO.piezas){
   const geo = new THREE.BoxGeometry(sx, sy, sz);
   const mat = new THREE.MeshStandardMaterial({
     color: p.color ? new THREE.Color(p.color) : colTabla,
-    roughness: 0.72, metalness: 0.02
+    roughness: 0.95, metalness: 0.0
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(px + sx/2, py + sy/2, pz + sz/2);   // pos = esquina mínima
@@ -129,13 +140,13 @@ const center = box.getCenter(new THREE.Vector3());
 grupo.position.sub(center);                 // centro del mueble en (0,0,0)
 
 // Suelo de referencia
-const grid = new THREE.GridHelper(Math.max(size.x,size.z)*3, 24, 0xc2c8d0, 0xd8dde3);
+const grid = new THREE.GridHelper(Math.max(size.x,size.z)*3, 24, 0xb4b9c0, 0xd2d6dc);
 grid.position.y = -size.y/2 - 0.1;
 scene.add(grid);
 
-// Cámara: vista frontal-superior-derecha
+// Cámara: vista frontal-superior-derecha (frentes hacia el espectador, en -Z)
 const radio = Math.max(size.x, size.y, size.z);
-camera.position.set(radio*1.1, radio*0.9, radio*1.7);
+camera.position.set(radio*1.0, radio*0.85, -radio*1.8);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
