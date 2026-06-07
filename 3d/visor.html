@@ -283,11 +283,11 @@ for (const p of MODELO.piezas){
     const geo = new THREE.ExtrudeGeometry(sh,
       { depth: p.ancho, bevelEnabled: false, steps: 1, curveSegments: 16 });
     geo.rotateY(-Math.PI / 2);                // extrusión (z) → ancho (x)
-    geo.translate(p.x0 + p.ancho, oy + yBase - 0.8, -1.9); // pala atrás · cazoleta al frente
+    geo.translate(p.x0 + p.ancho, oy + yBase - 0.8, -1.6); // pala alineada al dorso del frente (z=0)
     grupo.add(new THREE.Mesh(geo, matAlu));
-    // espiga/arpón inferior introducido DENTRO de la puerta (ranura del canto)
-    const sm = new THREE.Mesh(new THREE.BoxGeometry(p.ancho, 1.5, 0.4), matAlu);
-    sm.position.set(p.x0 + p.ancho/2, oy + yBase - 0.55, -1.05);
+    // espiga/arpón inferior, OCULTA dentro de la puerta (no asoma por la cazoleta)
+    const sm = new THREE.Mesh(new THREE.BoxGeometry(p.ancho, 1.6, 0.4), matAlu);
+    sm.position.set(p.x0 + p.ancho/2, oy + yBase - 1.4, -0.75);
     grupo.add(sm);
     continue;
   }
