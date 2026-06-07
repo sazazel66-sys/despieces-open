@@ -262,39 +262,33 @@ for (const p of MODELO.piezas){
     continue;
   }
 
-  // ── Uñero: perfil de aluminio con sección en "J" (pala inclinada + bead) ──
-  //   cotas calculadas a escala con el espesor de puerta (1,9 cm) de la foto:
-  //   alto 2,7 · chapa 0,15 · inclinación 22° · bead Ø1,1 · boca ~1,9 cm
+  // ── Uñero: perfil de aluminio según plano (uñero.jpg). Sección REAL extruida ──
+  //   cazoleta en U (curva) + pala alta + espiga inferior que entra en la puerta.
+  //   Cotas (cm): ancho 1,6 · alto pala 3,5 · chapa 0,15 · cazoleta Ø1,5 (r 0,75)
   if (p.forma === "unero"){
-    const yBase = p.yTop - UNERO_ALTO;       // arranque = nuevo top de la puerta
-    const cx = p.x0 + p.ancho/2;             // centro X (a todo el ancho)
-    const zf = -1.9;                         // cara frontal del frente (puerta)
-    const e  = 0.15;                         // espesor de chapa
-    const th = 22 * Math.PI / 180;           // inclinación de la pala
-    const addAlu = (g, x, y, z, rotX = 0, cantos = true) => {
-      const m = new THREE.Mesh(g, matAlu);
-      m.rotation.x = rotX;
-      m.position.set(x, oy + y, z);          // oy = elevación del cuerpo
-      grupo.add(m);
-      if (cantos){
-        const ed = new THREE.LineSegments(new THREE.EdgesGeometry(g),
-                   new THREE.LineBasicMaterial({ color: colCanto }));
-        ed.rotation.x = rotX; ed.position.copy(m.position); grupo.add(ed);
-      }
-    };
-    // 1) PALA inclinada: borde inferior-frontal enrasado con el frente de la puerta
-    const c = Math.cos(th), s = Math.sin(th);
-    const L = UNERO_ALTO / c + 0.2;          // longitud de la pala (cubre el alto)
-    // esquina inferior-frontal de la pala (local) tras rotar → se ancla en (zf, yBase)
-    const byr = (-L/2) * c - (-e/2) * s, bzr = (-L/2) * s + (-e/2) * c;
-    const ty = yBase - byr, tz = zf - bzr;   // traslación para anclar esa esquina
-    addAlu(new THREE.BoxGeometry(p.ancho, L, e), cx, ty, tz, th);
-    // 2) BEAD: cilindro horizontal (eje X) en el extremo superior-trasero = curva J
-    const tyr = (L/2) * c - (e/2) * s, tzr = (L/2) * s + (e/2) * c;
-    const topY = ty + tyr, topZ = tz + tzr;  // esquina superior-trasera de la pala
-    const r = 0.55;
-    const cg = new THREE.CylinderGeometry(r, r, p.ancho, 22); cg.rotateZ(Math.PI / 2);
-    addAlu(cg, cx, topY - 0.15, topZ + 0.1, 0, false);
+    const yBase = p.yTop - UNERO_ALTO;       // top de la puerta recortada
+    const Cu = 0.85, Cv = 0.85;              // centro de la cazoleta (u,v) en cm
+    const Ro = 0.75, Ri = 0.60, vTop = 3.5;  // radios exterior/interior · alto pala
+    // Contorno de la chapa (banda fina): pala dcha (front) → cazoleta U → pala izq
+    const sh = new THREE.Shape();
+    sh.moveTo(1.60, vTop);                    // pala (alta), borde frontal-exterior
+    sh.lineTo(1.60, Cv);                      // baja por el exterior hasta la cazoleta
+    sh.absarc(Cu, Cv, Ro, 0, Math.PI, true);  // cazoleta exterior (semicírculo inferior)
+    sh.lineTo(0.10, 1.50);                    // sube por la pared izquierda corta
+    sh.absarc(0.175, 1.50, 0.075, Math.PI, 0, false); // labio redondeado izquierdo
+    sh.lineTo(0.25, Cv);                      // baja por el interior de la pared izq
+    sh.absarc(Cu, Cv, Ri, Math.PI, 0, true);  // cazoleta interior (semicírculo inferior)
+    sh.lineTo(1.45, vTop);                    // sube por el interior de la pala
+    sh.lineTo(1.60, vTop);                    // cierra el espesor en la punta
+    const geo = new THREE.ExtrudeGeometry(sh,
+      { depth: p.ancho, bevelEnabled: false, steps: 1, curveSegments: 16 });
+    geo.rotateY(Math.PI / 2);                 // extrusión (z) → ancho (x)
+    geo.translate(p.x0, oy + yBase - 0.8, -0.3); // pala enrasada al frente (z=-1,9)
+    grupo.add(new THREE.Mesh(geo, matAlu));
+    // espiga/arpón inferior introducido DENTRO de la puerta (ranura del canto)
+    const sm = new THREE.Mesh(new THREE.BoxGeometry(p.ancho, 1.5, 0.4), matAlu);
+    sm.position.set(p.x0 + p.ancho/2, oy + yBase - 0.55, -1.15);
+    grupo.add(sm);
     continue;
   }
 
