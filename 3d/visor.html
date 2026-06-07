@@ -179,18 +179,20 @@ function tiradores(){
   return out;
 }
 
-// Asa VERTICAL para puerta, a 5 cm del borde de apertura (lado del tirador) y
-// centrada en alto. `f.lado` = "izq"|"der" (lado del tirador). e/c = 12,5 cm.
+// Asa VERTICAL para puerta de BAJO, a 5 cm del borde de apertura (lado del
+// tirador) y arriba: primer agujero a 5 cm del borde SUPERIOR, segundo a e/c
+// (12,5) por debajo. `f.lado` = "izq"|"der" (lado del tirador).
 function tiradorAsaVert(f, entreCentros = 12.5){
   const colM = "#8d9196";
-  const cy = f.y0 + f.alto/2;        // centro vertical de la puerta
-  const h  = entreCentros / 2;
+  const yTop = f.y0 + f.alto;
+  const ySup = yTop - 5;                                // primer agujero a 5 cm del top
+  const yInf = ySup - entreCentros;                     // segundo agujero (e/c 12,5)
   const cx = (f.lado === "der") ? 59.8 - 5 : 0.2 + 5;   // 5 cm del borde de apertura
-  const zBarra = -1.9 - 3.5;         // barra adelantada 3,5 cm sobre la cara
+  const zBarra = -1.9 - 3.5;                            // barra adelantada 3,5 cm sobre la cara
   return [
-    { nombre:"Tirador barra",    pos:[cx - 0.6, cy - h - 1.0, zBarra], size:[1.2, entreCentros + 2.0, 1.2], color:colM },
-    { nombre:"Tirador pata sup", pos:[cx - 0.6, cy + h - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM },
-    { nombre:"Tirador pata inf", pos:[cx - 0.6, cy - h - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM }
+    { nombre:"Tirador barra",    pos:[cx - 0.6, yInf - 1.0, zBarra], size:[1.2, entreCentros + 2.0, 1.2], color:colM },
+    { nombre:"Tirador pata sup", pos:[cx - 0.6, ySup - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM },
+    { nombre:"Tirador pata inf", pos:[cx - 0.6, yInf - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM }
   ];
 }
 
