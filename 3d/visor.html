@@ -96,8 +96,8 @@ const MODELO = {
 // cercano: patas del lado izquierdo giran 180º (saliente hacia -X).
 function patasMueble(ancho, fondo, alto, inset = 7.5){
   const out = [];
-  const haciaCostado = 2.5;   // acercar cada pata 2,5 cm a su costado
-  const bajar = 0.1;          // bajarlas 0,1 cm (penetran un poco menos)
+  const haciaCostado = 1.5;   // acercar cada pata 1,5 cm a su costado
+  const bajar = 0.2;          // bajarlas 0,2 cm (penetran un poco menos)
   for (const x of [inset - haciaCostado, ancho - inset + haciaCostado]){
     const rotY = (x < ancho / 2) ? Math.PI : 0;   // izquierda → saliente a -X
     for (const z of [inset, fondo - inset])
