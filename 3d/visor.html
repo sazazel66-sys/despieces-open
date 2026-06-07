@@ -277,7 +277,7 @@ for (const p of MODELO.piezas){
     sh.lineTo(0.10, 1.50);                    // sube por la pared izquierda corta
     sh.absarc(0.175, 1.50, 0.075, Math.PI, 0, false); // labio redondeado izquierdo
     sh.lineTo(0.25, Cv);                      // baja por el interior de la pared izq
-    sh.absarc(Cu, Cv, Ri, Math.PI, 0, true);  // cazoleta interior (semicírculo inferior)
+    sh.absarc(Cu, Cv, Ri, Math.PI, 0, false); // cazoleta interior (semicírculo INFERIOR)
     sh.lineTo(1.45, vTop);                    // sube por el interior de la pala
     sh.lineTo(1.60, vTop);                    // cierra el espesor en la punta
     const geo = new THREE.ExtrudeGeometry(sh,
