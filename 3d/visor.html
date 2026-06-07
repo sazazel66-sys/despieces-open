@@ -271,7 +271,9 @@ for (const p of MODELO.piezas){
   //   cazoleta en U (curva) + pala alta + espiga inferior que entra en la puerta.
   //   Cotas (cm): ancho 1,6 · alto pala 3,5 · chapa 0,15 · cazoleta Ø1,5 (r 0,75)
   if (p.forma === "unero"){
-    const yBase = p.yTop - UNERO_ALTO;       // top de la puerta recortada
+    // Bajado JUNTA_FRENTE para que el remate del perfil coincida con el top que
+    // tendría el frente con tirador de asa (frente+uñero = misma altura total).
+    const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE;
     const Cu = 0.85, Cv = 0.85;              // centro de la cazoleta (u,v) en cm
     const Ro = 0.75, Ri = 0.60, vTop = 3.5;  // radios exterior/interior · alto pala
     // Contorno de la chapa (banda fina): pala dcha (front) → cazoleta U → pala izq
