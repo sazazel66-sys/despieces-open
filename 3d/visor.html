@@ -72,14 +72,18 @@ const UNERO_PALA_BAJA       = 0.7;  // alto del lado izquierdo de la "J" (labio,
 
 // Frentes (y0 = base, alto). `puerta:true` → tirador vertical en el lado de
 // apertura (`lado:"izq"|"der"` = lado del tirador). Si no, cajón (tirador horiz.).
-// Bajo de UNA puerta derecha: bisagras a la derecha → tirador/apertura a la izq.
+// Bajo de 5 cajones iguales: 70 cm / 5 = 14 cm cada uno.
 const FRENTES = [
-  { y0:0, alto:70, puerta:true, lado:"izq" }   // puerta a todo el alto
+  { y0:0,  alto:14 },
+  { y0:14, alto:14 },
+  { y0:28, alto:14 },
+  { y0:42, alto:14 },
+  { y0:56, alto:14 }
 ];
 
 const MODELO = {
-  nombre: "Bajo 1 puerta (derecha)",
-  nota: "Puerta derecha (bisagras dcha) · 60 × 70 × 58 cm",
+  nombre: "Bajo 5 cajones",
+  nota: "5 cajones iguales (14 cm) · 60 × 70 × 58 cm",
   color: "#d6d8db",          // gris claro tipo "vista sombreada" (Rhino)
   canto: "#3a3d42",          // aristas gris oscuro
   elevacion: 15.5,           // altura de patas: el cuerpo se sube esta cota
@@ -92,7 +96,7 @@ const MODELO = {
     ["Espesor casco",   "1,6 cm"],
     ["Espesor puerta",  "1,9 cm"],
     ["Trasera",         "a 5 cm del fondo"],
-    ["Puerta",          "1 · apertura derecha"]
+    ["Cajones",         "5 × 14 cm"]
     // (la fila del tirador se añade dinámicamente según tipoTirador)
   ],
   piezas: [
@@ -103,8 +107,12 @@ const MODELO = {
     { nombre:"Techo",       pos:[1.6,  68.4, 0], size:[56.8, 1.6, 58] },
     // ── Trasera (encajada a 5 cm del fondo) ───────────────
     { nombre:"Trasera",     pos:[1.6,  1.6,  53], size:[56.8, 66.8, 0.5] },
-    // ── Puerta (cerrada, sobresale 1,9 cm), a todo el alto ──
-    { nombre:"Puerta", frente:true, pos:[0.2, 0, -1.9], size:[59.6, 70, 1.9] },
+    // ── 5 frentes de cajón iguales (cerrados, sobresalen 1,9 cm) ──
+    { nombre:"Frente cajón 1", frente:true, pos:[0.2, 0,  -1.9], size:[59.6, 14, 1.9] },
+    { nombre:"Frente cajón 2", frente:true, pos:[0.2, 14, -1.9], size:[59.6, 14, 1.9] },
+    { nombre:"Frente cajón 3", frente:true, pos:[0.2, 28, -1.9], size:[59.6, 14, 1.9] },
+    { nombre:"Frente cajón 4", frente:true, pos:[0.2, 42, -1.9], size:[59.6, 14, 1.9] },
+    { nombre:"Frente cajón 5", frente:true, pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
     // ── Patas (redondas regulables) ───────────────────────
     //    (los tiradores se añaden aparte en poblarGrupo, según tipoTirador)
     //    centro a 7,5 cm de cada borde (frente, trasera y laterales)
