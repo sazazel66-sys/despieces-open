@@ -50,9 +50,11 @@ const MODELO = {
   nota: "1 cajón pequeño (14) + 2 grandes (28) · 60 × 70 × 58 cm",
   color: "#d6d8db",          // gris claro tipo "vista sombreada" (Rhino)
   canto: "#3a3d42",          // aristas gris oscuro
+  elevacion: 15.5,           // altura de patas: el cuerpo se sube esta cota
   // Medidas que se muestran en el panel lateral (etiqueta → valor)
   medidas: [
-    ["Alto total",      "70 cm"],
+    ["Alto carcasa",    "70 cm"],
+    ["Patas",           "15,5 cm · centro a 7,5"],
     ["Ancho",           "60 cm"],
     ["Fondo",           "58 cm"],
     ["Espesor casco",   "1,6 cm"],
@@ -80,9 +82,24 @@ const MODELO = {
     //    barra a 3,5 cm de la cara del frente (cara frontal en z = -1,9)
     ...tiradorAsa(14),   // frente grande inferior  (centro Y = 14)
     ...tiradorAsa(42),   // frente grande medio     (centro Y = 42)
-    ...tiradorAsa(63)    // frente pequeño          (centro Y = 63)
+    ...tiradorAsa(63),   // frente pequeño          (centro Y = 63)
+    // ── Patas (redondas regulables) ───────────────────────
+    //    centro a 7,5 cm de cada borde (frente, trasera y laterales)
+    ...patasMueble(60, 58, 15.5)
   ]
 };
+
+// Cuatro patas redondas; centro a `inset` cm de cada borde del mueble.
+// alto = altura de pata · diam = diámetro. Marcadas base:true (no se elevan).
+function patasMueble(ancho, fondo, alto, inset = 7.5, diam = 5){
+  const col = "#9a9da2";            // gris metal
+  const out = [];
+  for (const x of [inset, ancho - inset])
+    for (const z of [inset, fondo - inset])
+      out.push({ nombre:"Pata", forma:"cilindro", base:true,
+                 pos:[x - diam/2, 0, z - diam/2], size:[diam, alto, diam], color:col });
+  return out;
+}
 
 // Genera un tirador de asa centrado en X del mueble, a una altura Y dada.
 // entreCentros = 12,5 cm (distancia entre agujeros). Color metal gris.
@@ -136,16 +153,20 @@ const grupo = new THREE.Group();
 const colTabla = new THREE.Color(MODELO.color || "#caa86b");
 const colCanto = new THREE.Color(MODELO.canto || "#5a4a2e");
 
+const elev = MODELO.elevacion || 0;     // las patas suben el cuerpo
 for (const p of MODELO.piezas){
   const [sx,sy,sz] = p.size;
   const [px,py,pz] = p.pos;
-  const geo = new THREE.BoxGeometry(sx, sy, sz);
+  const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
+  const geo = (p.forma === "cilindro")
+    ? new THREE.CylinderGeometry(sx/2, sx/2, sy, 24)   // eje Y, diámetro = sx
+    : new THREE.BoxGeometry(sx, sy, sz);
   const mat = new THREE.MeshStandardMaterial({
     color: p.color ? new THREE.Color(p.color) : colTabla,
     roughness: 0.95, metalness: 0.0
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(px + sx/2, py + sy/2, pz + sz/2);   // pos = esquina mínima
+  mesh.position.set(px + sx/2, oy + py + sy/2, pz + sz/2);   // pos = esquina mínima
   grupo.add(mesh);
   // aristas (aspecto de tablero)
   const edges = new THREE.LineSegments(

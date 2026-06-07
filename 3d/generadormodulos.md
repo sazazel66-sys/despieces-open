@@ -100,7 +100,15 @@ Ejemplo (60 × 70 × 58):
 - Generados con `tiradorAsa(centroY, entreCentros)` → devuelve barra + 2 patas (color metal `#8d9196`).
 - Patas en los puntos de agujero (`centroX ± entreCentros/2`); barra ~2 cm más larga que la distancia entre centros; adelantada 3,5 cm de la cara.
 
-## 9. Pendiente (fase 2)
+## 9. Patas
+
+- Por defecto **4 patas redondas regulables**: altura **15,5 cm**, diámetro 5 cm.
+- **Centro a 7,5 cm** de cada borde del mueble (frente, trasera y los dos laterales).
+- El cuerpo del mueble se **eleva** la altura de la pata: `MODELO.elevacion = 15.5`; todas las piezas que **no** sean patas se suben esa cota. Las patas se marcan `base:true` (no se elevan) y van de `y=0` a `y=alto`.
+- Se generan con `patasMueble(ancho, fondo, alto, inset=7.5, diam=5)` (color metal `#9a9da2`).
+- Soporte de geometría cilíndrica: pieza con `forma:"cilindro"` (eje Y, diámetro = `size[0]`, altura = `size[1]`).
+
+## 10. Pendiente (fase 2)
 
 - Mecanizaciones (ranuras, taladros, cajeados, guías).
 - Cajones abiertos / interiores de cajón.
