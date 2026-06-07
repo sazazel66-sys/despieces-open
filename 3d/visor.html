@@ -173,27 +173,11 @@ function tiradores(){
   return out;
 }
 
-// Perfil uñero de aluminio (falsa gola), a todo el ancho del frente. Ocupa la
-// franja superior de UNERO_ALTO cm (la puerta se recortó esa cota): cara frontal
-// enrasada con el frente, sube por encima de la puerta y curva hacia atrás
-// formando el hueco para los dedos. `yTop` = borde superior nominal del frente.
+// Perfil uñero de aluminio (falsa gola), a todo el ancho del frente. Devuelve un
+// marcador `forma:"unero"`; la sección en J (pala plana + bead redondeado) se
+// construye en el bucle de piezas. `yTop` = borde superior nominal del frente.
 function tiradorUnero(yTop, ancho = 59.6, x0 = 0.2){
-  const al = "#c8ccd0";                 // aluminio anodizado claro
-  const e = 0.25;                       // espesor de pared del perfil
-  const zCara = -1.9;                   // cara frontal del frente (puerta)
-  const zTras = 0;                      // cara trasera de la puerta
-  const yBase = yTop - UNERO_ALTO;       // arranque del perfil = nuevo top de puerta
-  const mat = { color:al, metal:0.7, rough:0.35 };
-  return [
-    // cara frontal enrasada con el frente, cubriendo la franja del perfil
-    { nombre:"Uñero frente", pos:[x0, yBase, zCara],      size:[ancho, UNERO_ALTO, e],        ...mat },
-    // pared trasera que sube por detrás de la puerta (un poco más alta)
-    { nombre:"Uñero trasera", pos:[x0, yBase, zTras - e], size:[ancho, UNERO_ALTO + 0.3, e],  ...mat },
-    // coronación superior: une frente y trasera por arriba (tapa del perfil)
-    { nombre:"Uñero techo", pos:[x0, yTop, zCara],        size:[ancho, e, (zTras) - zCara],   ...mat },
-    // labio que vuela hacia delante (se hooka con los dedos desde el frente-arriba)
-    { nombre:"Uñero labio", pos:[x0, yTop - e, zCara],    size:[ancho, e, 0.9],               ...mat }
-  ];
+  return [{ nombre:"Uñero", forma:"unero", yTop, ancho, x0, pos:[x0, 0, 0], size:[0, 0, 0] }];
 }
 
 // Genera un tirador de asa centrado en X del mueble, a una altura Y dada.
@@ -254,6 +238,7 @@ const elev = MODELO.elevacion || 0;     // las patas suben el cuerpo
 // Se escala un poco más alta (penetración) para que el remate entre en el suelo.
 const pataGeo = await cargarGeoPata("pata.stl", (elev || 15.5) + PATA_PENETRACION);
 const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
+const matAlu  = new THREE.MeshStandardMaterial({ color:0xc8ccd0, roughness:0.35, metalness:0.65 });
 
 for (const p of MODELO.piezas){
   const [sx,sy,sz] = p.size;
@@ -274,6 +259,32 @@ for (const p of MODELO.piezas){
       fm.position.set(px, h/2, pz);
       grupo.add(fm);
     }
+    continue;
+  }
+
+  // ── Uñero: perfil de aluminio con sección en J (pala plana + bead redondeado) ──
+  if (p.forma === "unero"){
+    const yB = p.yTop - UNERO_ALTO;          // arranque = nuevo top de la puerta
+    const cx = p.x0 + p.ancho/2;             // centro X (a todo el ancho)
+    const zf = -1.9, t = 0.3;                // cara frontal del frente · espesor pala
+    const addAlu = (g, x, y, z, cantos = true) => {
+      const m = new THREE.Mesh(g, matAlu);
+      m.position.set(x, oy + y, z);          // oy = elevación del cuerpo
+      grupo.add(m);
+      if (cantos){
+        const e = new THREE.LineSegments(new THREE.EdgesGeometry(g),
+                  new THREE.LineBasicMaterial({ color: colCanto }));
+        e.position.copy(m.position); grupo.add(e);
+      }
+    };
+    // 1) pala plana: cara frontal enrasada con el frente, sube por encima de la puerta
+    addAlu(new THREE.BoxGeometry(p.ancho, UNERO_ALTO, t), cx, (yB + p.yTop)/2, zf + t/2);
+    // 2) ala superior que vuela hacia atrás (une la pala con el bead)
+    addAlu(new THREE.BoxGeometry(p.ancho, t, 1.05), cx, p.yTop - t/2, zf + t + 1.05/2);
+    // 3) bead: cilindro horizontal (eje X) → curva redondeada de la "J" (hueco dedos)
+    const r = 0.62;
+    const cg = new THREE.CylinderGeometry(r, r, p.ancho, 22); cg.rotateZ(Math.PI/2);
+    addAlu(cg, cx, p.yTop - 0.15, zf + t + 1.05, false);
     continue;
   }
 
