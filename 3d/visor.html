@@ -19,6 +19,13 @@
   #medidas td{padding:1px 0}
   #medidas td.k{color:#889;padding-right:10px;white-space:nowrap}
   #medidas td.v{font-weight:600;text-align:right;white-space:nowrap}
+  /* Botón para alternar tipo de tirador */
+  #btnTirador{position:fixed;left:12px;bottom:34px;z-index:7;
+    font:600 12px system-ui,sans-serif;color:#2b3340;
+    background:rgba(255,255,255,.92);border:1px solid #c3c9d2;border-radius:7px;
+    padding:8px 13px;cursor:pointer;box-shadow:0 1px 5px rgba(40,50,70,.15)}
+  #btnTirador:hover{background:#fff}
+  #btnTirador:active{transform:translateY(1px)}
 </style>
 <script type="importmap">
 {
@@ -34,6 +41,7 @@
 <div id="sub"></div>
 <div id="medidas"></div>
 <div id="hint">Arrastra para girar · pellizca para zoom · dos dedos para mover</div>
+<button id="btnTirador">Tirador: uñero</button>
 <canvas id="c"></canvas>
 
 <script type="module">
@@ -50,17 +58,17 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 // descuenta de ALTO, anclando la parte baja (la cara inferior no se mueve).
 const JUNTA_FRENTE = 0.2;
 
-// Tipo de tirador a dibujar: "asa" (barra) | "unero" (perfil J a todo el ancho)
-const TIPO_TIRADOR = "unero";
+// Tipo de tirador a dibujar: "asa" (barra) | "unero" (perfil J a todo el ancho).
+// Mutable: el botón de la UI lo alterna y reconstruye la escena.
+let tipoTirador = "unero";
 
-// Alto de la pala del perfil uñero (referencia para colocar el perfil).
-const UNERO_ALTO = 2.7;
-// Cuánto se baja el frente en la zona del uñero para que se vea la gola completa
-// (la cazoleta del perfil baja hasta ~3,4 cm; con holgura → 3,6).
-const UNERO_RECORTE = 3.6;
-// Fondo de la franja DELANTERA del frente (la cara vista) que sube a su altura
-// completa; la parte trasera queda bajada para alojar el perfil/gola.
-const UNERO_FRENTE_DELANTE = 0.4;
+// ── Perfil uñero (falsa gola de aluminio a todo el ancho del frente) ─────────
+const UNERO_ALTO            = 2.7;  // alto nominal de la pala (referencia de colocación)
+const UNERO_RECORTE         = 3.6;  // cuánto se baja la zona trasera del frente para la gola
+const UNERO_FRENTE_DELANTE  = 0.4;  // fondo de la franja delantera del frente (cara vista)
+const UNERO_FRENTE_SALIENTE = 0.5;  // cuánto sube esa franja delantera sobre la trasera
+const UNERO_PALA_ALTA       = 3.5;  // alto del lado derecho de la "J" (pala, al dorso)
+const UNERO_PALA_BAJA       = 0.7;  // alto del lado izquierdo de la "J" (labio, al frente)
 
 // Frentes de cajón (y0 = base, alto) — usados para colocar los tiradores
 const FRENTES = [
@@ -85,10 +93,8 @@ const MODELO = {
     ["Espesor puerta",  "1,9 cm"],
     ["Trasera",         "a 5 cm del fondo"],
     ["Frente pequeño",  "14 cm"],
-    ["Frentes grandes", "28 cm × 2"],
-    (TIPO_TIRADOR === "asa"
-       ? ["Tirador (asa)",   "12,5 cm e/c"]
-       : ["Tirador (uñero)", "perfil 2,7 cm · recorta puerta"])
+    ["Frentes grandes", "28 cm × 2"]
+    // (la fila del tirador se añade dinámicamente según tipoTirador)
   ],
   piezas: [
     // ── Caja (60 × 70 × 58, casco espesor 1,6) ────────────
@@ -103,11 +109,8 @@ const MODELO = {
     { nombre:"Frente cajón grande inferior", frente:true, pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
     { nombre:"Frente cajón grande medio",    frente:true, pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
     { nombre:"Frente cajón pequeño",         frente:true, pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
-    // ── Tiradores (asa o uñero según TIPO_TIRADOR) ────────
-    //    asa: barra centrada en X, a 5 cm del borde superior de cada frente
-    //    uñero: perfil J de aluminio a todo el ancho, en el borde superior
-    ...tiradores(),
     // ── Patas (redondas regulables) ───────────────────────
+    //    (los tiradores se añaden aparte en poblarGrupo, según tipoTirador)
     //    centro a 7,5 cm de cada borde (frente, trasera y laterales)
     ...patasMueble(60, 58, 15.5)
   ]
@@ -165,17 +168,37 @@ async function cargarGeoPata(url, altoObjetivo){
   }
 }
 
-// Genera los tiradores de todos los frentes según TIPO_TIRADOR.
+// Genera los tiradores de todos los frentes según tipoTirador.
 //  · asa:   barra horizontal a 5 cm del borde SUPERIOR de cada frente
 //  · uñero: perfil J a todo el ancho, en el borde superior de cada frente
 function tiradores(){
   const out = [];
   for (const f of FRENTES){
     const yTop = f.y0 + f.alto;
-    if (TIPO_TIRADOR === "asa") out.push(...tiradorAsa(yTop - 5));
-    else                        out.push(...tiradorUnero(yTop));
+    if (tipoTirador === "asa") out.push(...tiradorAsa(yTop - 5));
+    else                       out.push(...tiradorUnero(yTop));
   }
   return out;
+}
+
+// Sección en "J" del perfil uñero (plano u=fondo 0..1,6 · v=alto). Base plana
+// MACIZA (apoya en todo el top de la puerta, sin huecos a los lados del radio) +
+// un único hueco redondo para los dedos; lado dcho alto (pala, al dorso) y lado
+// izq bajo (labio, al frente). Se extruye a lo ancho y se rota en el bucle.
+function shapeUnero(){
+  const Cu = 0.85, Cv = 0.85, Ri = 0.60;   // hueco del dedo: centro (u,v) y radio
+  const vBase = 0.10;                       // base plana = top de la puerta
+  const sh = new THREE.Shape();
+  sh.moveTo(1.60, UNERO_PALA_ALTA);                       // pala dcha (alta), exterior
+  sh.lineTo(1.60, vBase);                                 // baja el exterior a la base
+  sh.lineTo(0.10, vBase);                                 // base plana
+  sh.lineTo(0.10, UNERO_PALA_BAJA);                       // pared izq exterior (más baja)
+  sh.absarc(0.175, UNERO_PALA_BAJA, 0.075, Math.PI, 0, false); // labio redondeado izq
+  sh.lineTo(0.25, Cv);                                    // pared izq interior
+  sh.absarc(Cu, Cv, Ri, Math.PI, 0, false);              // hueco del dedo (semicírculo inf.)
+  sh.lineTo(1.45, UNERO_PALA_ALTA);                       // pala dcha interior
+  sh.lineTo(1.60, UNERO_PALA_ALTA);                       // cierra el espesor
+  return sh;
 }
 
 // Perfil uñero de aluminio (falsa gola), a todo el ancho del frente. Devuelve un
@@ -232,140 +255,117 @@ const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
 dir2.position.set(-1.4, 0.8, -1.0);
 scene.add(dir2);
 
-// Construir piezas
+// ── Construcción del mueble (reconstruible al alternar el tirador) ───────────
 const grupo = new THREE.Group();
+scene.add(grupo);
 const colTabla = new THREE.Color(MODELO.color || "#caa86b");
 const colCanto = new THREE.Color(MODELO.canto || "#5a4a2e");
-
 const elev = MODELO.elevacion || 0;     // las patas suben el cuerpo
 
 // Malla real de la pata (STL) — se clona en cada esquina; null si no carga.
-// Se escala un poco más alta (penetración) para que el remate entre en el suelo.
 const pataGeo = await cargarGeoPata("pata.stl", (elev || 15.5) + PATA_PENETRACION);
 const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
 const matAlu  = new THREE.MeshStandardMaterial({ color:0xc8ccd0, roughness:0.35, metalness:0.65 });
 
-for (const p of MODELO.piezas){
-  const [sx,sy,sz] = p.size;
-  const [px,py,pz] = p.pos;
-  const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
+let size = new THREE.Vector3();   // dimensiones del conjunto (para encuadrar cámara)
+let grid = null;                  // suelo de referencia (se rehace en cada build)
 
-  // ── Pata: instancia de la malla STL (apoyada en y=0, centrada en su pos) ──
-  if (p.forma === "stl"){
-    if (pataGeo){
-      const m = new THREE.Mesh(pataGeo, matPata);
-      m.rotation.y = p.rotY || 0;        // saliente hacia el costado más cercano
-      m.position.set(px, py, pz);        // eje del pie en (px,pz); py = bajada
-      grupo.add(m);
-    } else {                              // fallback: cilindro simple
-      const d = 5, h = p.alto || 15.5;
-      const fg = new THREE.CylinderGeometry(d/2, d/2, h, 20);
-      const fm = new THREE.Mesh(fg, matPata);
-      fm.position.set(px, h/2, pz);
-      grupo.add(fm);
-    }
-    continue;
-  }
-
-  // ── Uñero: perfil de aluminio según plano (uñero.jpg). Sección REAL extruida ──
-  //   cazoleta en U (curva) + pala alta + espiga inferior que entra en la puerta.
-  //   Cotas (cm): ancho 1,6 · alto pala 3,5 · chapa 0,15 · cazoleta Ø1,5 (r 0,75)
-  if (p.forma === "unero"){
-    // Bajado JUNTA_FRENTE para que el remate del perfil coincida con el top que
-    // tendría el frente con tirador de asa (frente+uñero = misma altura total).
-    const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE;
-    const Cu = 0.85, Cv = 0.85;              // centro de la cazoleta (u,v) en cm
-    const Ri = 0.60, vTop = 3.5;             // radio interior (hueco dedo) · alto pala dcha
-    const vBase = 0.10;                      // base plana = top de la puerta (rellena huecos)
-    const vLabio = 1.50 - 0.8;               // alto del lado izquierdo (pala corta): bajado 0,8
-    // Contorno MACIZO: base plana abajo (apoya en toda la línea de la puerta) y un
-    // único hueco redondo arriba para los dedos. Así no quedan huecos a los lados
-    // del radio (la cazoleta exterior ya no es un semicírculo que toca en un punto).
-    const sh = new THREE.Shape();
-    sh.moveTo(1.60, vTop);                    // pala (alta), borde frontal-exterior
-    sh.lineTo(1.60, vBase);                   // baja todo el exterior hasta la base
-    sh.lineTo(0.10, vBase);                   // base plana (apoya sobre el top de la puerta)
-    sh.lineTo(0.10, vLabio);                  // sube por la pared izquierda exterior (más baja)
-    sh.absarc(0.175, vLabio, 0.075, Math.PI, 0, false); // labio redondeado izquierdo
-    sh.lineTo(0.25, Cv);                      // baja por el interior de la pared izq
-    sh.absarc(Cu, Cv, Ri, Math.PI, 0, false); // hueco interior del dedo (semicírculo inferior)
-    sh.lineTo(1.45, vTop);                    // sube por el interior de la pala
-    sh.lineTo(1.60, vTop);                    // cierra el espesor en la punta
-    const geo = new THREE.ExtrudeGeometry(sh,
-      { depth: p.ancho, bevelEnabled: false, steps: 1, curveSegments: 16 });
-    geo.rotateY(-Math.PI / 2);                // extrusión (z) → ancho (x)
-    geo.translate(p.x0 + p.ancho, oy + yBase - 0.8, -1.6); // pala alineada al dorso del frente (z=0)
-    grupo.add(new THREE.Mesh(geo, matAlu));
-    // espiga/arpón inferior, OCULTA dentro de la puerta (no asoma por la cazoleta).
-    // 1 mm más corta por cada lado para que no se solape con el costado de lado.
-    const sm = new THREE.Mesh(new THREE.BoxGeometry(p.ancho - 0.2, 1.6, 0.4), matAlu);
-    sm.position.set(p.x0 + p.ancho/2, oy + yBase - 1.4, -0.75);
-    grupo.add(sm);
-    continue;
-  }
-
-  // Frente con uñero: UNA sola pieza con sección en L (perfil extruido a lo ancho).
-  // La franja DELANTERA (cara vista) sube más; la TRASERA queda bajada
-  // UNERO_RECORTE para alojar el perfil/gola. El escalón une ambas alturas.
-  if (p.frente && TIPO_TIRADOR === "unero"){
-    const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
-    const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
-    const altoDel = altoTras + 0.5;                    // delante: sobresale 0,5 cm sobre la trasera
-    const matF = new THREE.MeshStandardMaterial({
-      color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
-    // Sección en plano (a=profundidad 0..sz, b=altura): L con escalón en a=fDel
-    const sh = new THREE.Shape();
-    sh.moveTo(0,    0);                 // delantera-abajo
-    sh.lineTo(sz,   0);                 // trasera-abajo
-    sh.lineTo(sz,   altoTras);          // trasera-arriba (más baja)
-    sh.lineTo(fDel, altoTras);          // escalón horizontal
-    sh.lineTo(fDel, altoDel);           // escalón vertical
-    sh.lineTo(0,    altoDel);           // delantera-arriba (más alta)
-    sh.lineTo(0,    0);                 // cierra
-    const g = new THREE.ExtrudeGeometry(sh, { depth: sx, bevelEnabled:false, steps:1 });
-    g.rotateY(-Math.PI / 2);            // extrusión (z) → ancho (x)
-    g.translate(px + sx, oy + py, pz);  // a→z desde pz · b→y desde oy+py · ancho en x
-    grupo.add(new THREE.Mesh(g, matF));
-    grupo.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),
-      new THREE.LineBasicMaterial({ color: colCanto })));
-    continue;
-  }
-
-  // Frente/puerta: recorte en alto, anclado abajo (pos.y intacta).
-  const recorte = JUNTA_FRENTE;
-  const sy2 = p.frente ? sy - recorte : sy;
-  const geo = (p.forma === "cilindro")
-    ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
-    : new THREE.BoxGeometry(sx, sy2, sz);
-  const mat = new THREE.MeshStandardMaterial({
-    color: p.color ? new THREE.Color(p.color) : colTabla,
-    roughness: p.rough ?? 0.95, metalness: p.metal ?? 0.0
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(px + sx/2, oy + py + sy2/2, pz + sz/2);   // pos = esquina mínima (anclado abajo)
-  grupo.add(mesh);
-  // aristas (aspecto de tablero) — se omiten en piezas torneadas pequeñas (sinCanto)
-  if (!p.sinCanto){
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({ color: colCanto })
-    );
-    edges.position.copy(mesh.position);
-    grupo.add(edges);
+// Añade una malla al grupo, opcionalmente con su contorno de aristas (canto).
+// Si la geometría ya viene trasladada a su sitio, omitir `pos`.
+function addConCanto(geo, mat, pos, conCanto = true){
+  const m = new THREE.Mesh(geo, mat);
+  if (pos) m.position.copy(pos);
+  grupo.add(m);
+  if (conCanto){
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: colCanto }));
+    if (pos) e.position.copy(pos);
+    grupo.add(e);
   }
 }
-scene.add(grupo);
 
-// Centrar el grupo en el origen y encuadrar cámara
-const box = new THREE.Box3().setFromObject(grupo);
-const size = box.getSize(new THREE.Vector3());
-const center = box.getCenter(new THREE.Vector3());
-grupo.position.sub(center);                 // centro del mueble en (0,0,0)
+// (Re)construye el mueble: piezas fijas + tiradores del tipo activo.
+function poblarGrupo(){
+  for (const c of grupo.children)               // liberar geometrías (salvo la pata compartida)
+    if (c.geometry && c.geometry !== pataGeo) c.geometry.dispose();
+  grupo.clear();
+  grupo.position.set(0,0,0);
 
-// Suelo de referencia
-const grid = new THREE.GridHelper(Math.max(size.x,size.z)*3, 24, 0xb4b9c0, 0xd2d6dc);
-grid.position.y = -size.y/2 - 0.1;
-scene.add(grid);
+  for (const p of [...MODELO.piezas, ...tiradores()]){
+    const [sx,sy,sz] = p.size;
+    const [px,py,pz] = p.pos;
+    const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
+
+    // ── Pata: instancia de la malla STL (apoyada en y=0, centrada en su pos) ──
+    if (p.forma === "stl"){
+      if (pataGeo){
+        const m = new THREE.Mesh(pataGeo, matPata);
+        m.rotation.y = p.rotY || 0;        // saliente hacia el costado más cercano
+        m.position.set(px, py, pz);        // eje del pie en (px,pz); py = bajada
+        grupo.add(m);
+      } else {                              // fallback: cilindro simple
+        const h = p.alto || 15.5;
+        const fm = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, h, 20), matPata);
+        fm.position.set(px, h/2, pz);
+        grupo.add(fm);
+      }
+      continue;
+    }
+
+    // ── Perfil uñero: sección en "J" (shapeUnero) extruida a todo el ancho ──
+    // Bajado JUNTA_FRENTE para que frente+uñero remate a la misma altura que con asa.
+    if (p.forma === "unero"){
+      const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE;
+      const geo = new THREE.ExtrudeGeometry(shapeUnero(),
+        { depth: p.ancho, bevelEnabled:false, steps:1, curveSegments:16 });
+      geo.rotateY(-Math.PI/2);                                // extrusión (z) → ancho (x)
+      geo.translate(p.x0 + p.ancho, oy + yBase - 0.8, -1.6);  // pala al dorso del frente (z=0)
+      grupo.add(new THREE.Mesh(geo, matAlu));
+      // espiga oculta dentro de la puerta (1 mm más corta por lado: no asoma de lado)
+      const sm = new THREE.Mesh(new THREE.BoxGeometry(p.ancho - 0.2, 1.6, 0.4), matAlu);
+      sm.position.set(p.x0 + p.ancho/2, oy + yBase - 1.4, -0.75);
+      grupo.add(sm);
+      continue;
+    }
+
+    // ── Frente con uñero: UNA pieza, sección en L (delante alto · detrás bajo) ──
+    // La franja delantera (cara vista) sube; la trasera baja UNERO_RECORTE para la gola.
+    if (p.frente && tipoTirador === "unero"){
+      const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);
+      const altoTras = sy - UNERO_RECORTE;
+      const altoDel = altoTras + UNERO_FRENTE_SALIENTE;
+      const sh = new THREE.Shape();
+      sh.moveTo(0, 0); sh.lineTo(sz, 0); sh.lineTo(sz, altoTras);
+      sh.lineTo(fDel, altoTras); sh.lineTo(fDel, altoDel); sh.lineTo(0, altoDel); sh.lineTo(0, 0);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: sx, bevelEnabled:false, steps:1 });
+      g.rotateY(-Math.PI/2);              // extrusión (z) → ancho (x)
+      g.translate(px + sx, oy + py, pz);  // a→z desde pz · b→y desde oy+py
+      addConCanto(g, new THREE.MeshStandardMaterial({
+        color: p.color ? new THREE.Color(p.color) : colTabla, roughness:0.95 }));
+      continue;
+    }
+
+    // ── Resto: cajas, frentes con asa, cilindros/conos ──
+    const sy2 = p.frente ? sy - JUNTA_FRENTE : sy;   // frente: holgura anclada abajo
+    const geo = (p.forma === "cilindro")
+      ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24) // rTop/rBot → cono
+      : new THREE.BoxGeometry(sx, sy2, sz);
+    const mat = new THREE.MeshStandardMaterial({
+      color: p.color ? new THREE.Color(p.color) : colTabla,
+      roughness: p.rough ?? 0.95, metalness: p.metal ?? 0.0 });
+    addConCanto(geo, mat, new THREE.Vector3(px + sx/2, oy + py + sy2/2, pz + sz/2), !p.sinCanto);
+  }
+
+  // Centrar el conjunto en el origen y (re)colocar el suelo de referencia
+  const box = new THREE.Box3().setFromObject(grupo);
+  size = box.getSize(new THREE.Vector3());
+  grupo.position.sub(box.getCenter(new THREE.Vector3()));   // centro del mueble en (0,0,0)
+  if (grid) scene.remove(grid);
+  grid = new THREE.GridHelper(Math.max(size.x, size.z)*3, 24, 0xb4b9c0, 0xd2d6dc);
+  grid.position.y = -size.y/2 - 0.1;
+  scene.add(grid);
+}
+poblarGrupo();
 
 // Cámara: vista frontal-superior-derecha (frentes hacia el espectador, en -Z)
 const radio = Math.max(size.x, size.y, size.z);
@@ -383,17 +383,32 @@ controls.update();
 document.getElementById('info').textContent = MODELO.nombre || "Mueble";
 document.getElementById('sub').textContent  = MODELO.nota || "";
 
-// Panel de medidas
-(function(){
+// Panel de medidas (incluye la fila del tirador según el tipo activo)
+function actualizarMedidas(){
   const cont = document.getElementById('medidas');
-  if (!MODELO.medidas || !MODELO.medidas.length){ cont.style.display='none'; return; }
+  const base = MODELO.medidas || [];
+  const filaTirador = (tipoTirador === "asa")
+    ? ["Tirador (asa)",   "12,5 cm e/c"]
+    : ["Tirador (uñero)", "perfil falsa gola"];
   let html = '<h3>Medidas</h3><table>';
-  for (const [k,v] of MODELO.medidas){
+  for (const [k,v] of [...base, filaTirador])
     html += '<tr><td class="k">'+k+'</td><td class="v">'+v+'</td></tr>';
-  }
-  html += '</table>';
-  cont.innerHTML = html;
-})();
+  cont.innerHTML = html + '</table>';
+}
+actualizarMedidas();
+
+// Botón: alterna asa ⇄ uñero y reconstruye la escena entera
+const btnTirador = document.getElementById('btnTirador');
+function actualizarBoton(){
+  btnTirador.textContent = (tipoTirador === "unero") ? "Tirador: uñero" : "Tirador: asa";
+}
+btnTirador.addEventListener('click', () => {
+  tipoTirador = (tipoTirador === "unero") ? "asa" : "unero";
+  poblarGrupo();
+  actualizarMedidas();
+  actualizarBoton();
+});
+actualizarBoton();
 
 // Resize
 function resize(){
