@@ -302,8 +302,8 @@ for (const p of MODELO.piezas){
   // para alojar el perfil/gola y que asome por detrás del borde delantero.
   if (p.frente && TIPO_TIRADOR === "unero"){
     const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
-    const altoDel = sy - JUNTA_FRENTE;                 // delante: altura completa (solo junta)
     const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
+    const altoDel = altoTras + 0.8;                    // delante: 0,8 cm más alta que la trasera
     const matF = new THREE.MeshStandardMaterial({
       color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
     const partes = [
