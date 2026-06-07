@@ -58,6 +58,9 @@ const UNERO_ALTO = 2.7;
 // Cuánto se baja el frente en la zona del uñero para que se vea la gola completa
 // (la cazoleta del perfil baja hasta ~3,4 cm; con holgura → 3,6).
 const UNERO_RECORTE = 3.6;
+// Fondo de la franja DELANTERA del frente (la cara vista) que sube a su altura
+// completa; la parte trasera queda bajada para alojar el perfil/gola.
+const UNERO_FRENTE_DELANTE = 0.4;
 
 // Frentes de cajón (y0 = base, alto) — usados para colocar los tiradores
 const FRENTES = [
@@ -294,11 +297,34 @@ for (const p of MODELO.piezas){
     continue;
   }
 
+  // Frente con uñero: se parte en dos cajas en profundidad. La franja DELANTERA
+  // (cara vista) sube a su altura completa; la TRASERA queda bajada UNERO_RECORTE
+  // para alojar el perfil/gola y que asome por detrás del borde delantero.
+  if (p.frente && TIPO_TIRADOR === "unero"){
+    const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
+    const altoDel = sy - JUNTA_FRENTE;                 // delante: altura completa (solo junta)
+    const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
+    const matF = new THREE.MeshStandardMaterial({
+      color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
+    const partes = [
+      [px, oy + py, pz + fDel, sx, altoTras, sz - fDel],   // trasera (alberga el perfil): bajada
+      [px, oy + py, pz,        sx, altoDel,  fDel]          // delantera (cara vista): sube completa
+    ];
+    for (const [qx, qy, qz, ax, ay, az] of partes){
+      const g = new THREE.BoxGeometry(ax, ay, az);
+      const m = new THREE.Mesh(g, matF);
+      m.position.set(qx + ax/2, qy + ay/2, qz + az/2);
+      grupo.add(m);
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g),
+        new THREE.LineBasicMaterial({ color: colCanto }));
+      e.position.copy(m.position);
+      grupo.add(e);
+    }
+    continue;
+  }
+
   // Frente/puerta: recorte en alto, anclado abajo (pos.y intacta).
-  //  · asa  → solo la junta de 0,2 cm
-  //  · uñero → se baja el frente UNERO_RECORTE (más que la pala 2,7) para que
-  //            asome la cazoleta completa del perfil (que llega a ~3,4 cm).
-  const recorte = (TIPO_TIRADOR === "unero") ? UNERO_RECORTE : JUNTA_FRENTE;
+  const recorte = JUNTA_FRENTE;
   const sy2 = p.frente ? sy - recorte : sy;
   const geo = (p.forma === "cilindro")
     ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
