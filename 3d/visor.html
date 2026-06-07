@@ -96,10 +96,12 @@ const MODELO = {
 // cercano: patas del lado izquierdo giran 180º (saliente hacia -X).
 function patasMueble(ancho, fondo, alto, inset = 7.5){
   const out = [];
-  for (const x of [inset, ancho - inset]){
+  const haciaCostado = 2.5;   // acercar cada pata 2,5 cm a su costado
+  const bajar = 0.1;          // bajarlas 0,1 cm (penetran un poco menos)
+  for (const x of [inset - haciaCostado, ancho - inset + haciaCostado]){
     const rotY = (x < ancho / 2) ? Math.PI : 0;   // izquierda → saliente a -X
     for (const z of [inset, fondo - inset])
-      out.push({ nombre:"Pata", forma:"stl", base:true, alto, rotY, pos:[x, 0, z], size:[0,0,0] });
+      out.push({ nombre:"Pata", forma:"stl", base:true, alto, rotY, pos:[x, -bajar, z], size:[0,0,0] });
   }
   return out;
 }
@@ -209,7 +211,7 @@ for (const p of MODELO.piezas){
     if (pataGeo){
       const m = new THREE.Mesh(pataGeo, matPata);
       m.rotation.y = p.rotY || 0;        // saliente hacia el costado más cercano
-      m.position.set(px, 0, pz);         // eje del pie en (px,pz), base en y=0
+      m.position.set(px, py, pz);        // eje del pie en (px,pz); py = bajada
       grupo.add(m);
     } else {                              // fallback: cilindro simple
       const d = 5, h = p.alto || 15.5;
