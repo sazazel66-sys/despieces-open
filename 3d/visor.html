@@ -11,15 +11,14 @@
   #sub{position:fixed;top:30px;left:12px;color:#778;font-size:12px;z-index:5}
   #hint{position:fixed;bottom:10px;left:0;right:0;text-align:center;color:#889;font-size:12px;z-index:5}
   /* Panel de medidas (lado derecho) */
-  #medidas{position:fixed;top:10px;right:10px;z-index:6;background:rgba(255,255,255,.88);
-           border:1px solid #d4d9e0;border-radius:10px;padding:10px 12px;
-           box-shadow:0 2px 10px rgba(40,50,70,.12);min-width:150px;backdrop-filter:blur(2px)}
-  #medidas h3{margin:0 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#556}
-  #medidas table{border-collapse:collapse;font-size:13px;color:#334}
-  #medidas td{padding:2px 0}
-  #medidas td.k{color:#778;padding-right:14px;white-space:nowrap}
+  #medidas{position:fixed;top:8px;right:8px;z-index:6;background:rgba(255,255,255,.88);
+           border:1px solid #d4d9e0;border-radius:8px;padding:6px 8px;
+           box-shadow:0 1px 6px rgba(40,50,70,.12);backdrop-filter:blur(2px)}
+  #medidas h3{margin:0 0 3px;font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:#667}
+  #medidas table{border-collapse:collapse;font-size:10px;color:#334;line-height:1.25}
+  #medidas td{padding:1px 0}
+  #medidas td.k{color:#889;padding-right:10px;white-space:nowrap}
   #medidas td.v{font-weight:600;text-align:right;white-space:nowrap}
-  @media (max-width:480px){#medidas{font-size:12px;padding:8px 10px;min-width:130px}}
 </style>
 <script type="importmap">
 {
@@ -59,7 +58,8 @@ const MODELO = {
     ["Espesor tablero", "1,9 cm"],
     ["Trasera",         "a 5 cm del fondo"],
     ["Frente pequeño",  "14 cm"],
-    ["Frentes grandes", "28 cm × 2"]
+    ["Frentes grandes", "28 cm × 2"],
+    ["Tirador (asa)",   "12,5 cm e/c"]
   ],
   piezas: [
     // ── Caja (60 × 70 × 58, espesor 1,9) ──────────────────
@@ -73,9 +73,32 @@ const MODELO = {
     //    de abajo arriba: grande 28 · grande 28 · pequeño 14
     { nombre:"Frente cajón grande inferior", pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
     { nombre:"Frente cajón grande medio",    pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
-    { nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] }
+    { nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
+    // ── Tiradores tipo asa (12,5 cm entre centros) ────────
+    //    centrados en X (mueble 60 → centro 30; agujeros a 30 ± 6,25)
+    //    barra a 3,5 cm de la cara del frente (cara frontal en z = -1,9)
+    ...tiradorAsa(14),   // frente grande inferior  (centro Y = 14)
+    ...tiradorAsa(42),   // frente grande medio     (centro Y = 42)
+    ...tiradorAsa(63)    // frente pequeño          (centro Y = 63)
   ]
 };
+
+// Genera un tirador de asa centrado en X del mueble, a una altura Y dada.
+// entreCentros = 12,5 cm (distancia entre agujeros). Color metal gris.
+function tiradorAsa(cy, entreCentros = 12.5){
+  const colM = "#8d9196";          // gris metal
+  const cx = 30;                    // centro X del mueble (ancho 60)
+  const h  = entreCentros / 2;      // 6,25
+  const zCara = -1.9;               // cara frontal del frente
+  const zBarra = zCara - 3.5;       // barra adelantada 3,5 cm
+  return [
+    // barra horizontal (un poco más larga que la distancia entre centros)
+    { nombre:"Tirador barra", pos:[cx - h - 1.0, cy - 0.6, zBarra], size:[entreCentros + 2.0, 1.2, 1.2], color:colM },
+    // dos patas hasta la cara del frente, en los puntos de los agujeros
+    { nombre:"Tirador pata izq", pos:[cx - h - 0.6, cy - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM },
+    { nombre:"Tirador pata der", pos:[cx + h - 0.6, cy - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM }
+  ];
+}
 
 // ── Escena ──────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');

@@ -83,7 +83,15 @@ Ejemplo (60 × 70 × 58):
 { nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9], color:"#d8b878" }
 ```
 
-## 7. Pendiente (fase 2)
+## 7. Tiradores (asas)
+
+- Tipo **asa**: barra horizontal adelantada de la cara del frente sobre dos patas.
+- **Entre centros (distancia entre agujeros) = 12,5 cm** por defecto.
+- Centrados en X del mueble; un tirador por frente, a la altura central del frente.
+- Generados con `tiradorAsa(centroY, entreCentros)` → devuelve barra + 2 patas (color metal `#8d9196`).
+- Patas en los puntos de agujero (`centroX ± entreCentros/2`); barra ~2 cm más larga que la distancia entre centros; adelantada 3,5 cm de la cara.
+
+## 8. Pendiente (fase 2)
 
 - Mecanizaciones (ranuras, taladros, cajeados, guías).
 - Cajones abiertos / interiores de cajón.
