@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Visor 3D — Despieces Presenti</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#eef1f4;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+  #c{display:block;width:100vw;height:100vh;touch-action:none}
+  #info{position:fixed;top:10px;left:12px;color:#334;font-size:14px;font-weight:600;z-index:5;text-shadow:0 1px 2px #fff}
+  #sub{position:fixed;top:30px;left:12px;color:#778;font-size:12px;z-index:5}
+  #hint{position:fixed;bottom:10px;left:0;right:0;text-align:center;color:#889;font-size:12px;z-index:5}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="info">—</div>
+<div id="sub"></div>
+<div id="hint">Arrastra para girar · pellizca para zoom · dos dedos para mover</div>
+<canvas id="c"></canvas>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ───────────────────────────────────────────────────────────────────────────
+//  MODELO DEL MUEBLE  (cm:  X = anchura,  Y = altura,  Z = fondo)
+//  pos = esquina mínima [x,y,z]   ·   size = [ancho, alto, fondo]
+//  Vamos sobrescribiendo este objeto a medida que añadimos piezas.
+// ───────────────────────────────────────────────────────────────────────────
+const MODELO = {
+  nombre: "Bajo cajones (en construcción)",
+  nota: "Caja incompleta: 2 costados + suelo + techo · 50 × 73,5 × 50 cm",
+  color: "#caa86b",          // color tabla por defecto
+  canto: "#5a4a2e",          // color de aristas
+  piezas: [
+    { nombre:"Costado Izq", pos:[0,    0,    0], size:[1.9, 73.5, 50] },
+    { nombre:"Costado Der", pos:[48.1, 0,    0], size:[1.9, 73.5, 50] },
+    { nombre:"Suelo",       pos:[1.9,  0,    0], size:[46.2, 1.9, 50] },
+    { nombre:"Techo",       pos:[1.9,  71.6, 0], size:[46.2, 1.9, 50] }
+  ]
+};
+
+// ── Escena ──────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeef1f4);
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 1, 5000);
+
+// Luces (sombreado de tablas)
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9099a5, 0.95));
+const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+dir.position.set(1.2, 2.0, 1.6);
+scene.add(dir);
+const dir2 = new THREE.DirectionalLight(0xffffff, 0.35);
+dir2.position.set(-1.5, 0.6, -1.0);
+scene.add(dir2);
+
+// Construir piezas
+const grupo = new THREE.Group();
+const colTabla = new THREE.Color(MODELO.color || "#caa86b");
+const colCanto = new THREE.Color(MODELO.canto || "#5a4a2e");
+
+for (const p of MODELO.piezas){
+  const [sx,sy,sz] = p.size;
+  const [px,py,pz] = p.pos;
+  const geo = new THREE.BoxGeometry(sx, sy, sz);
+  const mat = new THREE.MeshStandardMaterial({
+    color: p.color ? new THREE.Color(p.color) : colTabla,
+    roughness: 0.72, metalness: 0.02
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(px + sx/2, py + sy/2, pz + sz/2);   // pos = esquina mínima
+  grupo.add(mesh);
+  // aristas (aspecto de tablero)
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: colCanto })
+  );
+  edges.position.copy(mesh.position);
+  grupo.add(edges);
+}
+scene.add(grupo);
+
+// Centrar el grupo en el origen y encuadrar cámara
+const box = new THREE.Box3().setFromObject(grupo);
+const size = box.getSize(new THREE.Vector3());
+const center = box.getCenter(new THREE.Vector3());
+grupo.position.sub(center);                 // centro del mueble en (0,0,0)
+
+// Suelo de referencia
+const grid = new THREE.GridHelper(Math.max(size.x,size.z)*3, 24, 0xc2c8d0, 0xd8dde3);
+grid.position.y = -size.y/2 - 0.1;
+scene.add(grid);
+
+// Cámara: vista frontal-superior-derecha
+const radio = Math.max(size.x, size.y, size.z);
+camera.position.set(radio*1.1, radio*0.9, radio*1.7);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0,0,0);
+controls.minDistance = radio*0.6;
+controls.maxDistance = radio*6;
+controls.update();
+
+// Texto
+document.getElementById('info').textContent = MODELO.nombre || "Mueble";
+document.getElementById('sub').textContent  = MODELO.nota || "";
+
+// Resize
+function resize(){
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+// Loop
+(function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
