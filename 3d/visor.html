@@ -75,9 +75,9 @@ const MODELO = {
     { nombre:"Trasera",     pos:[1.6,  1.6,  53], size:[56.8, 66.8, 0.5] },
     // ── Frentes de cajones (cerrados, sobresalen 1,9 cm) ──
     //    de abajo arriba: grande 28 · grande 28 · pequeño 14
-    { nombre:"Frente cajón grande inferior", pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
-    { nombre:"Frente cajón grande medio",    pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
-    { nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
+    { nombre:"Frente cajón grande inferior", frente:true, pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
+    { nombre:"Frente cajón grande medio",    frente:true, pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
+    { nombre:"Frente cajón pequeño",         frente:true, pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
     // ── Tiradores tipo asa (12,5 cm entre centros) ────────
     //    centrados en X (mueble 60 → centro 30; agujeros a 30 ± 6,25)
     //    barra a 3,5 cm de la cara del frente (cara frontal en z = -1,9)
@@ -108,6 +108,10 @@ function patasMueble(ancho, fondo, alto, inset = 7.5){
 
 // Cuánto se introduce el remate superior de la pata dentro del suelo del mueble
 const PATA_PENETRACION = 1.6;   // ≈ espesor del suelo
+
+// Junta de holgura de TODO frente/puerta: tras hallar su tamaño y posición, se
+// descuenta de ALTO, anclando la parte baja (la cara inferior no se mueve).
+const JUNTA_FRENTE = 0.2;
 
 // Carga la malla STL de la pata, la orienta (pie abajo) y la normaliza:
 // el EJE DEL PIE (no el bounding box, que el saliente descentra) queda en X=Z=0,
@@ -223,15 +227,17 @@ for (const p of MODELO.piezas){
     continue;
   }
 
+  // Frente/puerta: descuento de junta en alto, anclado abajo (pos.y intacta)
+  const sy2 = p.frente ? sy - JUNTA_FRENTE : sy;
   const geo = (p.forma === "cilindro")
     ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
-    : new THREE.BoxGeometry(sx, sy, sz);
+    : new THREE.BoxGeometry(sx, sy2, sz);
   const mat = new THREE.MeshStandardMaterial({
     color: p.color ? new THREE.Color(p.color) : colTabla,
     roughness: p.rough ?? 0.95, metalness: p.metal ?? 0.0
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(px + sx/2, oy + py + sy/2, pz + sz/2);   // pos = esquina mínima
+  mesh.position.set(px + sx/2, oy + py + sy2/2, pz + sz/2);   // pos = esquina mínima (anclado abajo)
   grupo.add(mesh);
   // aristas (aspecto de tablero) — se omiten en piezas torneadas pequeñas (sinCanto)
   if (!p.sinCanto){
