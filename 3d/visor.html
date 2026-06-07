@@ -70,16 +70,16 @@ const UNERO_FRENTE_SALIENTE = 0.5;  // cuánto sube esa franja delantera sobre l
 const UNERO_PALA_ALTA       = 3.5;  // alto del lado derecho de la "J" (pala, al dorso)
 const UNERO_PALA_BAJA       = 0.7;  // alto del lado izquierdo de la "J" (labio, al frente)
 
-// Frentes de cajón (y0 = base, alto) — usados para colocar los tiradores
+// Frentes (y0 = base, alto). `puerta:true` → tirador vertical en el lado de
+// apertura (`lado:"izq"|"der"` = lado del tirador). Si no, cajón (tirador horiz.).
+// Bajo de UNA puerta derecha: bisagras a la derecha → tirador/apertura a la izq.
 const FRENTES = [
-  { y0:0,  alto:28 },   // grande inferior
-  { y0:28, alto:28 },   // grande medio
-  { y0:56, alto:14 }    // pequeño superior
+  { y0:0, alto:70, puerta:true, lado:"izq" }   // puerta a todo el alto
 ];
 
 const MODELO = {
-  nombre: "Bajo cajones",
-  nota: "1 cajón pequeño (14) + 2 grandes (28) · 60 × 70 × 58 cm",
+  nombre: "Bajo 1 puerta (derecha)",
+  nota: "Puerta derecha (bisagras dcha) · 60 × 70 × 58 cm",
   color: "#d6d8db",          // gris claro tipo "vista sombreada" (Rhino)
   canto: "#3a3d42",          // aristas gris oscuro
   elevacion: 15.5,           // altura de patas: el cuerpo se sube esta cota
@@ -92,8 +92,7 @@ const MODELO = {
     ["Espesor casco",   "1,6 cm"],
     ["Espesor puerta",  "1,9 cm"],
     ["Trasera",         "a 5 cm del fondo"],
-    ["Frente pequeño",  "14 cm"],
-    ["Frentes grandes", "28 cm × 2"]
+    ["Puerta",          "1 · apertura derecha"]
     // (la fila del tirador se añade dinámicamente según tipoTirador)
   ],
   piezas: [
@@ -104,11 +103,8 @@ const MODELO = {
     { nombre:"Techo",       pos:[1.6,  68.4, 0], size:[56.8, 1.6, 58] },
     // ── Trasera (encajada a 5 cm del fondo) ───────────────
     { nombre:"Trasera",     pos:[1.6,  1.6,  53], size:[56.8, 66.8, 0.5] },
-    // ── Frentes de cajones (cerrados, sobresalen 1,9 cm) ──
-    //    de abajo arriba: grande 28 · grande 28 · pequeño 14
-    { nombre:"Frente cajón grande inferior", frente:true, pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
-    { nombre:"Frente cajón grande medio",    frente:true, pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
-    { nombre:"Frente cajón pequeño",         frente:true, pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
+    // ── Puerta (cerrada, sobresale 1,9 cm), a todo el alto ──
+    { nombre:"Puerta", frente:true, pos:[0.2, 0, -1.9], size:[59.6, 70, 1.9] },
     // ── Patas (redondas regulables) ───────────────────────
     //    (los tiradores se añaden aparte en poblarGrupo, según tipoTirador)
     //    centro a 7,5 cm de cada borde (frente, trasera y laterales)
@@ -175,10 +171,27 @@ function tiradores(){
   const out = [];
   for (const f of FRENTES){
     const yTop = f.y0 + f.alto;
-    if (tipoTirador === "asa") out.push(...tiradorAsa(yTop - 5));
-    else                       out.push(...tiradorUnero(yTop));
+    if (tipoTirador === "asa")
+      out.push(...(f.puerta ? tiradorAsaVert(f) : tiradorAsa(yTop - 5)));
+    else
+      out.push(...tiradorUnero(yTop));
   }
   return out;
+}
+
+// Asa VERTICAL para puerta, a 5 cm del borde de apertura (lado del tirador) y
+// centrada en alto. `f.lado` = "izq"|"der" (lado del tirador). e/c = 12,5 cm.
+function tiradorAsaVert(f, entreCentros = 12.5){
+  const colM = "#8d9196";
+  const cy = f.y0 + f.alto/2;        // centro vertical de la puerta
+  const h  = entreCentros / 2;
+  const cx = (f.lado === "der") ? 59.8 - 5 : 0.2 + 5;   // 5 cm del borde de apertura
+  const zBarra = -1.9 - 3.5;         // barra adelantada 3,5 cm sobre la cara
+  return [
+    { nombre:"Tirador barra",    pos:[cx - 0.6, cy - h - 1.0, zBarra], size:[1.2, entreCentros + 2.0, 1.2], color:colM },
+    { nombre:"Tirador pata sup", pos:[cx - 0.6, cy + h - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM },
+    { nombre:"Tirador pata inf", pos:[cx - 0.6, cy - h - 0.6, zBarra + 1.2], size:[1.2, 1.2, 2.3], color:colM }
+  ];
 }
 
 // Sección en "J" del perfil uñero (plano u=fondo 0..1,6 · v=alto). Base plana
