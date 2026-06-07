@@ -54,7 +54,7 @@ const MODELO = {
   // Medidas que se muestran en el panel lateral (etiqueta → valor)
   medidas: [
     ["Alto carcasa",    "70 cm"],
-    ["Patas",           "15,5 cm · centro a 7,5"],
+    ["Pata regulable",  "15,5 cm · pie Ø6 · centro a 7,5"],
     ["Ancho",           "60 cm"],
     ["Fondo",           "58 cm"],
     ["Espesor casco",   "1,6 cm"],
@@ -89,16 +89,55 @@ const MODELO = {
   ]
 };
 
-// Cuatro patas redondas; centro a `inset` cm de cada borde del mueble.
-// alto = altura de pata · diam = diámetro. Marcadas base:true (no se elevan).
-function patasMueble(ancho, fondo, alto, inset = 7.5, diam = 5){
-  const col = "#9a9da2";            // gris metal
+// Cuatro patas niveladoras de cocina; centro a `inset` cm de cada borde.
+// Cada pata = pie redondo + husillo roscado + casquillo + placa de fijación + clip.
+function patasMueble(ancho, fondo, alto, inset = 7.5){
   const out = [];
   for (const x of [inset, ancho - inset])
     for (const z of [inset, fondo - inset])
-      out.push({ nombre:"Pata", forma:"cilindro", base:true,
-                 pos:[x - diam/2, 0, z - diam/2], size:[diam, alto, diam], color:col });
+      out.push(...pataMueble(x, z, alto));
   return out;
+}
+
+// Una pata niveladora de cocina (tipo ABS/Häfele AXILO) centrada en (cx,cz).
+// Modelada para alto = 15,5 cm y escalada en Y con k = alto/15,5.
+//  ── pie redondo abombado · husillo roscado regulable · casquillo · placa
+//     de fijación cuadrada (se atornilla al suelo) · clip que entra en el taladro
+function pataMueble(cx, cz, alto){
+  const k = alto / 15.5;            // escala vertical
+  const negro = "#2c2e32";          // plástico ABS negro
+  const metal = "#9aa0a6";          // acero del husillo
+  const metalC = "#c2c6cc";         // brillo de la rosca
+  const P = [];
+  // cilindro centrado en (cx,cz): atajo
+  const cil = (nombre, y0, h, d, col, extra = {}) =>
+    P.push({ nombre, forma:"cilindro", base:true, sinCanto:true,
+             pos:[cx - d/2, y0, cz - d/2], size:[d, h, d], color:col,
+             rough:0.6, metal:0.15, ...extra });
+
+  // 1) pie de apoyo redondo (ligeramente cónico, más ancho abajo)
+  P.push({ nombre:"Pata · pie", forma:"cilindro", base:true, sinCanto:true,
+           rBot:3.0, rTop:2.5, pos:[cx - 3.0, 0, cz - 3.0], size:[6.0, 1.5*k, 6.0],
+           color:negro, rough:0.7 });
+
+  // 2) husillo roscado: núcleo de acero + anillos de rosca apilados
+  const yH = 1.5*k, hH = 9.0*k;
+  cil("Pata · husillo", yH, hH, 3.0, metal, { metal:0.55, rough:0.4, seg:16 });
+  for (let yr = yH + 0.4*k; yr < yH + hH - 0.4*k; yr += 0.72*k)
+    cil("Pata · rosca", yr, 0.34*k, 3.7, metalC, { metal:0.55, rough:0.35, seg:16 });
+
+  // 3) casquillo superior (donde el husillo enrosca en la placa)
+  cil("Pata · casquillo", (1.5 + 9.0)*k, 2.0*k, 4.2, negro, { rough:0.7 });
+
+  // 4) placa de fijación cuadrada (se atornilla al suelo del mueble)
+  P.push({ nombre:"Pata · placa", base:true, sinCanto:true,
+           pos:[cx - 4.0, (1.5 + 9.0 + 2.0)*k, cz - 4.0], size:[8.0, 1.6*k, 8.0],
+           color:negro, rough:0.7 });
+
+  // 5) clip/espiga que entra en el taladro a media madera del suelo
+  cil("Pata · clip", (1.5 + 9.0 + 2.0 + 1.6)*k, 0.9*k, 3.0, negro, { rough:0.7 });
+
+  return P;
 }
 
 // Genera un tirador de asa centrado en X del mueble, a una altura Y dada.
@@ -159,22 +198,24 @@ for (const p of MODELO.piezas){
   const [px,py,pz] = p.pos;
   const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
   const geo = (p.forma === "cilindro")
-    ? new THREE.CylinderGeometry(sx/2, sx/2, sy, 24)   // eje Y, diámetro = sx
+    ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
     : new THREE.BoxGeometry(sx, sy, sz);
   const mat = new THREE.MeshStandardMaterial({
     color: p.color ? new THREE.Color(p.color) : colTabla,
-    roughness: 0.95, metalness: 0.0
+    roughness: p.rough ?? 0.95, metalness: p.metal ?? 0.0
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(px + sx/2, oy + py + sy/2, pz + sz/2);   // pos = esquina mínima
   grupo.add(mesh);
-  // aristas (aspecto de tablero)
-  const edges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geo),
-    new THREE.LineBasicMaterial({ color: colCanto })
-  );
-  edges.position.copy(mesh.position);
-  grupo.add(edges);
+  // aristas (aspecto de tablero) — se omiten en piezas torneadas pequeñas (sinCanto)
+  if (!p.sinCanto){
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: colCanto })
+    );
+    edges.position.copy(mesh.position);
+    grupo.add(edges);
+  }
 }
 scene.add(grupo);
 
