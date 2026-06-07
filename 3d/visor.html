@@ -305,7 +305,7 @@ for (const p of MODELO.piezas){
   if (p.frente && TIPO_TIRADOR === "unero"){
     const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
     const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
-    const altoDel = altoTras + 2.4;                    // delante: sube hasta cubrir la parte baja del tirador
+    const altoDel = altoTras + 1.2;                    // delante: sobresale la mitad sobre la trasera
     const matF = new THREE.MeshStandardMaterial({
       color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
     const partes = [
