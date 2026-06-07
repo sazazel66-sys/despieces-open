@@ -271,12 +271,13 @@ for (const p of MODELO.piezas){
   //   cazoleta en U (curva) + pala alta + espiga inferior que entra en la puerta.
   //   Cotas (cm): ancho 1,6 · alto pala 3,5 · chapa 0,15 · cazoleta Ø1,5 (r 0,75)
   if (p.forma === "unero"){
-    // Bajado JUNTA_FRENTE + 0,8 (afinado a ojo con el usuario) para que el perfil
-    // y la franja delantera del frente queden 0,8 cm más bajos a la vez.
-    const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE - 0.8;
+    // Bajado JUNTA_FRENTE para que el remate del perfil coincida con el top que
+    // tendría el frente con tirador de asa (frente+uñero = misma altura total).
+    const yBase = p.yTop - UNERO_ALTO - JUNTA_FRENTE;
     const Cu = 0.85, Cv = 0.85;              // centro de la cazoleta (u,v) en cm
-    const Ri = 0.60, vTop = 3.5;             // radio interior (hueco dedo) · alto pala
+    const Ri = 0.60, vTop = 3.5;             // radio interior (hueco dedo) · alto pala dcha
     const vBase = 0.10;                      // base plana = top de la puerta (rellena huecos)
+    const vLabio = 1.50 - 0.8;               // alto del lado izquierdo (pala corta): bajado 0,8
     // Contorno MACIZO: base plana abajo (apoya en toda la línea de la puerta) y un
     // único hueco redondo arriba para los dedos. Así no quedan huecos a los lados
     // del radio (la cazoleta exterior ya no es un semicírculo que toca en un punto).
@@ -284,8 +285,8 @@ for (const p of MODELO.piezas){
     sh.moveTo(1.60, vTop);                    // pala (alta), borde frontal-exterior
     sh.lineTo(1.60, vBase);                   // baja todo el exterior hasta la base
     sh.lineTo(0.10, vBase);                   // base plana (apoya sobre el top de la puerta)
-    sh.lineTo(0.10, 1.50);                    // sube por la pared izquierda exterior
-    sh.absarc(0.175, 1.50, 0.075, Math.PI, 0, false); // labio redondeado izquierdo
+    sh.lineTo(0.10, vLabio);                  // sube por la pared izquierda exterior (más baja)
+    sh.absarc(0.175, vLabio, 0.075, Math.PI, 0, false); // labio redondeado izquierdo
     sh.lineTo(0.25, Cv);                      // baja por el interior de la pared izq
     sh.absarc(Cu, Cv, Ri, Math.PI, 0, false); // hueco interior del dedo (semicírculo inferior)
     sh.lineTo(1.45, vTop);                    // sube por el interior de la pala
@@ -309,7 +310,7 @@ for (const p of MODELO.piezas){
   if (p.frente && TIPO_TIRADOR === "unero"){
     const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
     const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
-    const altoDel = altoTras + 0.5;                    // delante: sobresale 0,5 cm sobre la trasera
+    const altoDel = altoTras + 1.3;                    // delante: sobresale 1,3 cm sobre la trasera
     const matF = new THREE.MeshStandardMaterial({
       color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
     // Sección en plano (a=profundidad 0..sz, b=altura): L con escalón en a=fDel
