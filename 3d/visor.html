@@ -303,29 +303,30 @@ for (const p of MODELO.piezas){
     continue;
   }
 
-  // Frente con uñero: se parte en dos cajas en profundidad. La franja DELANTERA
-  // (cara vista) sube a su altura completa; la TRASERA queda bajada UNERO_RECORTE
-  // para alojar el perfil/gola y que asome por detrás del borde delantero.
+  // Frente con uñero: UNA sola pieza con sección en L (perfil extruido a lo ancho).
+  // La franja DELANTERA (cara vista) sube más; la TRASERA queda bajada
+  // UNERO_RECORTE para alojar el perfil/gola. El escalón une ambas alturas.
   if (p.frente && TIPO_TIRADOR === "unero"){
     const fDel = Math.min(UNERO_FRENTE_DELANTE, sz);   // fondo de la lengüeta delantera
     const altoTras = sy - UNERO_RECORTE;               // detrás: bajado para la gola
     const altoDel = altoTras + 1.3;                    // delante: sobresale 1,3 cm sobre la trasera
     const matF = new THREE.MeshStandardMaterial({
       color: p.color ? new THREE.Color(p.color) : colTabla, roughness: 0.95 });
-    const partes = [
-      [px, oy + py, pz + fDel, sx, altoTras, sz - fDel],   // trasera (alberga el perfil): bajada
-      [px, oy + py, pz,        sx, altoDel,  fDel]          // delantera (cara vista): sube completa
-    ];
-    for (const [qx, qy, qz, ax, ay, az] of partes){
-      const g = new THREE.BoxGeometry(ax, ay, az);
-      const m = new THREE.Mesh(g, matF);
-      m.position.set(qx + ax/2, qy + ay/2, qz + az/2);
-      grupo.add(m);
-      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g),
-        new THREE.LineBasicMaterial({ color: colCanto }));
-      e.position.copy(m.position);
-      grupo.add(e);
-    }
+    // Sección en plano (a=profundidad 0..sz, b=altura): L con escalón en a=fDel
+    const sh = new THREE.Shape();
+    sh.moveTo(0,    0);                 // delantera-abajo
+    sh.lineTo(sz,   0);                 // trasera-abajo
+    sh.lineTo(sz,   altoTras);          // trasera-arriba (más baja)
+    sh.lineTo(fDel, altoTras);          // escalón horizontal
+    sh.lineTo(fDel, altoDel);           // escalón vertical
+    sh.lineTo(0,    altoDel);           // delantera-arriba (más alta)
+    sh.lineTo(0,    0);                 // cierra
+    const g = new THREE.ExtrudeGeometry(sh, { depth: sx, bevelEnabled:false, steps:1 });
+    g.rotateY(-Math.PI / 2);            // extrusión (z) → ancho (x)
+    g.translate(px + sx, oy + py, pz);  // a→z desde pz · b→y desde oy+py · ancho en x
+    grupo.add(new THREE.Mesh(g, matF));
+    grupo.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),
+      new THREE.LineBasicMaterial({ color: colCanto })));
     continue;
   }
 
