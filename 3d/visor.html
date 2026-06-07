@@ -262,29 +262,39 @@ for (const p of MODELO.piezas){
     continue;
   }
 
-  // ── Uñero: perfil de aluminio con sección en J (pala plana + bead redondeado) ──
+  // ── Uñero: perfil de aluminio con sección en "J" (pala inclinada + bead) ──
+  //   cotas calculadas a escala con el espesor de puerta (1,9 cm) de la foto:
+  //   alto 2,7 · chapa 0,15 · inclinación 22° · bead Ø1,1 · boca ~1,9 cm
   if (p.forma === "unero"){
-    const yB = p.yTop - UNERO_ALTO;          // arranque = nuevo top de la puerta
+    const yBase = p.yTop - UNERO_ALTO;       // arranque = nuevo top de la puerta
     const cx = p.x0 + p.ancho/2;             // centro X (a todo el ancho)
-    const zf = -1.9, t = 0.3;                // cara frontal del frente · espesor pala
-    const addAlu = (g, x, y, z, cantos = true) => {
+    const zf = -1.9;                         // cara frontal del frente (puerta)
+    const e  = 0.15;                         // espesor de chapa
+    const th = 22 * Math.PI / 180;           // inclinación de la pala
+    const addAlu = (g, x, y, z, rotX = 0, cantos = true) => {
       const m = new THREE.Mesh(g, matAlu);
+      m.rotation.x = rotX;
       m.position.set(x, oy + y, z);          // oy = elevación del cuerpo
       grupo.add(m);
       if (cantos){
-        const e = new THREE.LineSegments(new THREE.EdgesGeometry(g),
-                  new THREE.LineBasicMaterial({ color: colCanto }));
-        e.position.copy(m.position); grupo.add(e);
+        const ed = new THREE.LineSegments(new THREE.EdgesGeometry(g),
+                   new THREE.LineBasicMaterial({ color: colCanto }));
+        ed.rotation.x = rotX; ed.position.copy(m.position); grupo.add(ed);
       }
     };
-    // 1) pala plana: cara frontal enrasada con el frente, sube por encima de la puerta
-    addAlu(new THREE.BoxGeometry(p.ancho, UNERO_ALTO, t), cx, (yB + p.yTop)/2, zf + t/2);
-    // 2) ala superior que vuela hacia atrás (une la pala con el bead)
-    addAlu(new THREE.BoxGeometry(p.ancho, t, 1.05), cx, p.yTop - t/2, zf + t + 1.05/2);
-    // 3) bead: cilindro horizontal (eje X) → curva redondeada de la "J" (hueco dedos)
-    const r = 0.62;
-    const cg = new THREE.CylinderGeometry(r, r, p.ancho, 22); cg.rotateZ(Math.PI/2);
-    addAlu(cg, cx, p.yTop - 0.15, zf + t + 1.05, false);
+    // 1) PALA inclinada: borde inferior-frontal enrasado con el frente de la puerta
+    const c = Math.cos(th), s = Math.sin(th);
+    const L = UNERO_ALTO / c + 0.2;          // longitud de la pala (cubre el alto)
+    // esquina inferior-frontal de la pala (local) tras rotar → se ancla en (zf, yBase)
+    const byr = (-L/2) * c - (-e/2) * s, bzr = (-L/2) * s + (-e/2) * c;
+    const ty = yBase - byr, tz = zf - bzr;   // traslación para anclar esa esquina
+    addAlu(new THREE.BoxGeometry(p.ancho, L, e), cx, ty, tz, th);
+    // 2) BEAD: cilindro horizontal (eje X) en el extremo superior-trasero = curva J
+    const tyr = (L/2) * c - (e/2) * s, tzr = (L/2) * s + (e/2) * c;
+    const topY = ty + tyr, topZ = tz + tzr;  // esquina superior-trasera de la pala
+    const r = 0.55;
+    const cg = new THREE.CylinderGeometry(r, r, p.ancho, 22); cg.rotateZ(Math.PI / 2);
+    addAlu(cg, cx, topY - 0.15, topZ + 0.1, 0, false);
     continue;
   }
 
