@@ -48,28 +48,37 @@ Estilo **vista sombreada tipo Rhino** en blancos y grises (no alámbrico, no mad
 - Todas las piezas usan el mismo gris; **no** poner `color` por pieza salvo que se quiera resaltar algo. Las juntas (cajones/puertas) se ven por las aristas.
 - Cámara por defecto: vista frontal-superior-derecha con los **frentes hacia el espectador** (frentes en `-Z`, cámara en `-Z`).
 
-## 4. Carcasa (caja) estándar
+## 4. Espesores de tablero
 
-Para un mueble de `ANCHO × ALTO × FONDO`, espesor de tablero **1,9 cm**:
+Se leen del **material**: del material de **cascos** para la carcasa y del material de **puertas** para los frentes. Por defecto:
+
+- **Casco (carcasa): `EC = 1,6 cm`**
+- **Puertas/frentes: `EP = 1,9 cm`**
+
+(usar estos defaults mientras no haya material asignado).
+
+## 5. Carcasa (caja) estándar
+
+Para un mueble de `ANCHO × ALTO × FONDO`, espesor de casco `EC` (1,6 por defecto):
 
 | Pieza | pos | size |
 |-------|-----|------|
-| Costado Izq | `[0, 0, 0]` | `[1.9, ALTO, FONDO]` |
-| Costado Der | `[ANCHO-1.9, 0, 0]` | `[1.9, ALTO, FONDO]` |
-| Suelo | `[1.9, 0, 0]` | `[ANCHO-3.8, 1.9, FONDO]` |
-| Techo | `[1.9, ALTO-1.9, 0]` | `[ANCHO-3.8, 1.9, FONDO]` |
-| Trasera | `[1.9, 1.9, FONDO-T]` | `[ANCHO-3.8, ALTO-3.8, 0.5]` |
+| Costado Izq | `[0, 0, 0]` | `[EC, ALTO, FONDO]` |
+| Costado Der | `[ANCHO-EC, 0, 0]` | `[EC, ALTO, FONDO]` |
+| Suelo | `[EC, 0, 0]` | `[ANCHO-2·EC, EC, FONDO]` |
+| Techo | `[EC, ALTO-EC, 0]` | `[ANCHO-2·EC, EC, FONDO]` |
+| Trasera | `[EC, EC, FONDO-T]` | `[ANCHO-2·EC, ALTO-2·EC, 0.5]` |
 
-- Suelo y techo van **entre** los costados (de ahí `ANCHO-3.8`).
+- Suelo y techo van **entre** los costados (de ahí `ANCHO-2·EC`).
 - **Trasera** encajada a `T` cm del fondo: **Bajos `T=5` · Altos `T=1.6`**. Espesor trasera `0.5`.
 
-## 5. Frentes (puertas y cajones)
+## 6. Frentes (puertas y cajones)
 
-- Cerrados, **sobresalen 1,9 cm** por delante → `z` del frente = `-1.9`, espesor `1.9`.
+- Espesor `EP` (1,9 por defecto). Cerrados, **sobresalen** por delante → `z` del frente = `-EP`, fondo del box = `EP`.
 - Holgura de **0,2 cm** por cada lado → ancho del frente = `ANCHO-0.4`, `pos.x = 0.2`.
 - Apilados en Y cubriendo el alto del mueble (las aristas marcan las juntas).
 
-## 6. Cajones — proporciones (cocina)
+## 7. Cajones — proporciones (cocina)
 
 - Para un **bajo de cajones de 70 cm de alto**: frente pequeño = **14**, frentes grandes = **28**.
 - Combinación por defecto: **1 pequeño (arriba) + 2 grandes (abajo)** → 14 + 28 + 28 = 70.
@@ -78,12 +87,12 @@ Para un mueble de `ANCHO × ALTO × FONDO`, espesor de tablero **1,9 cm**:
 Ejemplo (60 × 70 × 58):
 
 ```js
-{ nombre:"Frente cajón grande inferior", pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9], color:"#d8b878" },
-{ nombre:"Frente cajón grande medio",    pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9], color:"#d8b878" },
-{ nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9], color:"#d8b878" }
+{ nombre:"Frente cajón grande inferior", pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
+{ nombre:"Frente cajón grande medio",    pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
+{ nombre:"Frente cajón pequeño",         pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] }
 ```
 
-## 7. Tiradores (asas)
+## 8. Tiradores (asas)
 
 - Tipo **asa**: barra horizontal adelantada de la cara del frente sobre dos patas.
 - **Entre centros (distancia entre agujeros) = 12,5 cm** por defecto.
@@ -91,7 +100,7 @@ Ejemplo (60 × 70 × 58):
 - Generados con `tiradorAsa(centroY, entreCentros)` → devuelve barra + 2 patas (color metal `#8d9196`).
 - Patas en los puntos de agujero (`centroX ± entreCentros/2`); barra ~2 cm más larga que la distancia entre centros; adelantada 3,5 cm de la cara.
 
-## 8. Pendiente (fase 2)
+## 9. Pendiente (fase 2)
 
 - Mecanizaciones (ranuras, taladros, cajeados, guías).
 - Cajones abiertos / interiores de cajón.
