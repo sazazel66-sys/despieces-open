@@ -46,6 +46,20 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 //  pos = esquina mínima [x,y,z]   ·   size = [ancho, alto, fondo]
 //  Vamos sobrescribiendo este objeto a medida que añadimos piezas.
 // ───────────────────────────────────────────────────────────────────────────
+// Junta de holgura de TODO frente/puerta: tras hallar su tamaño y posición, se
+// descuenta de ALTO, anclando la parte baja (la cara inferior no se mueve).
+const JUNTA_FRENTE = 0.2;
+
+// Tipo de tirador a dibujar: "asa" (barra) | "unero" (perfil J a todo el ancho)
+const TIPO_TIRADOR = "unero";
+
+// Frentes de cajón (y0 = base, alto) — usados para colocar los tiradores
+const FRENTES = [
+  { y0:0,  alto:28 },   // grande inferior
+  { y0:28, alto:28 },   // grande medio
+  { y0:56, alto:14 }    // pequeño superior
+];
+
 const MODELO = {
   nombre: "Bajo cajones",
   nota: "1 cajón pequeño (14) + 2 grandes (28) · 60 × 70 × 58 cm",
@@ -63,7 +77,9 @@ const MODELO = {
     ["Trasera",         "a 5 cm del fondo"],
     ["Frente pequeño",  "14 cm"],
     ["Frentes grandes", "28 cm × 2"],
-    ["Tirador (asa)",   "12,5 cm e/c"]
+    (TIPO_TIRADOR === "asa"
+       ? ["Tirador (asa)",   "12,5 cm e/c"]
+       : ["Tirador (uñero)", "perfil J · todo el ancho"])
   ],
   piezas: [
     // ── Caja (60 × 70 × 58, casco espesor 1,6) ────────────
@@ -78,12 +94,10 @@ const MODELO = {
     { nombre:"Frente cajón grande inferior", frente:true, pos:[0.2, 0,  -1.9], size:[59.6, 28, 1.9] },
     { nombre:"Frente cajón grande medio",    frente:true, pos:[0.2, 28, -1.9], size:[59.6, 28, 1.9] },
     { nombre:"Frente cajón pequeño",         frente:true, pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
-    // ── Tiradores tipo asa (12,5 cm entre centros) ────────
-    //    centrados en X (mueble 60 → centro 30; agujeros a 30 ± 6,25)
-    //    barra a 3,5 cm de la cara del frente (cara frontal en z = -1,9)
-    ...tiradorAsa(14),   // frente grande inferior  (centro Y = 14)
-    ...tiradorAsa(42),   // frente grande medio     (centro Y = 42)
-    ...tiradorAsa(63),   // frente pequeño          (centro Y = 63)
+    // ── Tiradores (asa o uñero según TIPO_TIRADOR) ────────
+    //    asa: barra centrada en X, a 5 cm del borde superior de cada frente
+    //    uñero: perfil J de aluminio a todo el ancho, en el borde superior
+    ...tiradores(),
     // ── Patas (redondas regulables) ───────────────────────
     //    centro a 7,5 cm de cada borde (frente, trasera y laterales)
     ...patasMueble(60, 58, 15.5)
@@ -108,10 +122,6 @@ function patasMueble(ancho, fondo, alto, inset = 7.5){
 
 // Cuánto se introduce el remate superior de la pata dentro del suelo del mueble
 const PATA_PENETRACION = 1.6;   // ≈ espesor del suelo
-
-// Junta de holgura de TODO frente/puerta: tras hallar su tamaño y posición, se
-// descuenta de ALTO, anclando la parte baja (la cara inferior no se mueve).
-const JUNTA_FRENTE = 0.2;
 
 // Carga la malla STL de la pata, la orienta (pie abajo) y la normaliza:
 // el EJE DEL PIE (no el bounding box, que el saliente descentra) queda en X=Z=0,
@@ -144,6 +154,39 @@ async function cargarGeoPata(url, altoObjetivo){
     console.warn("No se pudo cargar la pata STL:", e);
     return null;
   }
+}
+
+// Genera los tiradores de todos los frentes según TIPO_TIRADOR.
+//  · asa:   barra horizontal a 5 cm del borde SUPERIOR de cada frente
+//  · uñero: perfil J a todo el ancho, en el borde superior de cada frente
+function tiradores(){
+  const out = [];
+  for (const f of FRENTES){
+    const yTop = f.y0 + f.alto;
+    if (TIPO_TIRADOR === "asa") out.push(...tiradorAsa(yTop - 5));
+    else                        out.push(...tiradorUnero(yTop - JUNTA_FRENTE));
+  }
+  return out;
+}
+
+// Perfil tipo "J" (uñero / falsa gola) de aluminio, a todo el ancho del frente,
+// montado en su borde superior `yTop`. Sección J en el plano Y-Z:
+//   alma vertical (atornillada por detrás del frente) · coronación horizontal
+//   superior · labio frontal que baja → hueco para los dedos por encima.
+function tiradorUnero(yTop, ancho = 59.6, x0 = 0.2){
+  const al = "#b9bdc3";                 // aluminio
+  const e = 0.2;                        // espesor de pared del perfil
+  const zCara = -1.9;                   // cara frontal del frente
+  const zLabio = zCara - 0.5;           // labio asoma 0,5 cm por delante
+  const mat = { color:al, metal:0.8, rough:0.3 };
+  return [
+    // alma vertical pegada a la cara interior del frente (z = 0 → e)
+    { nombre:"Uñero alma",       pos:[x0, yTop - 5,   0],      size:[ancho, 5, e],                 ...mat },
+    // coronación horizontal superior (de la cara interior al labio frontal)
+    { nombre:"Uñero coronación", pos:[x0, yTop,       zLabio], size:[ancho, e, (0 + e) - zLabio],  ...mat },
+    // labio frontal que baja (la curva de la J)
+    { nombre:"Uñero labio",      pos:[x0, yTop - 1.6, zLabio], size:[ancho, 1.6, e],               ...mat }
+  ];
 }
 
 // Genera un tirador de asa centrado en X del mueble, a una altura Y dada.
