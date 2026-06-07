@@ -367,9 +367,10 @@ function poblarGrupo(){
 }
 poblarGrupo();
 
-// Cámara: vista frontal-superior-derecha (frentes hacia el espectador, en -Z)
+// Cámara: vista 3/4 tipo catálogo (frente + costado derecho, ligera elevación).
+// Frentes hacia -Z; diagonal ~30° en horizontal y ~18° de picado.
 const radio = Math.max(size.x, size.y, size.z);
-camera.position.set(radio*1.0, radio*0.85, -radio*1.8);
+camera.position.set(radio*0.85, radio*0.55, -radio*1.5);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
