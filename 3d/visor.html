@@ -53,9 +53,11 @@ const JUNTA_FRENTE = 0.2;
 // Tipo de tirador a dibujar: "asa" (barra) | "unero" (perfil J a todo el ancho)
 const TIPO_TIRADOR = "unero";
 
-// Alto del perfil uñero. La puerta se RECORTA esta cota por arriba, de modo que
-// puerta_recortada + uñero = alto total del frente (la suma no cambia).
+// Alto de la pala del perfil uñero (referencia para colocar el perfil).
 const UNERO_ALTO = 2.7;
+// Cuánto se baja el frente en la zona del uñero para que se vea la gola completa
+// (la cazoleta del perfil baja hasta ~3,4 cm; con holgura → 3,6).
+const UNERO_RECORTE = 3.6;
 
 // Frentes de cajón (y0 = base, alto) — usados para colocar los tiradores
 const FRENTES = [
@@ -294,8 +296,9 @@ for (const p of MODELO.piezas){
 
   // Frente/puerta: recorte en alto, anclado abajo (pos.y intacta).
   //  · asa  → solo la junta de 0,2 cm
-  //  · uñero → se recorta el alto del perfil (2,7) para alojarlo arriba
-  const recorte = (TIPO_TIRADOR === "unero") ? UNERO_ALTO : JUNTA_FRENTE;
+  //  · uñero → se baja el frente UNERO_RECORTE (más que la pala 2,7) para que
+  //            asome la cazoleta completa del perfil (que llega a ~3,4 cm).
+  const recorte = (TIPO_TIRADOR === "unero") ? UNERO_RECORTE : JUNTA_FRENTE;
   const sy2 = p.frente ? sy - recorte : sy;
   const geo = (p.forma === "cilindro")
     ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
