@@ -53,6 +53,10 @@ const JUNTA_FRENTE = 0.2;
 // Tipo de tirador a dibujar: "asa" (barra) | "unero" (perfil J a todo el ancho)
 const TIPO_TIRADOR = "unero";
 
+// Alto del perfil uñero. La puerta se RECORTA esta cota por arriba, de modo que
+// puerta_recortada + uñero = alto total del frente (la suma no cambia).
+const UNERO_ALTO = 2.7;
+
 // Frentes de cajón (y0 = base, alto) — usados para colocar los tiradores
 const FRENTES = [
   { y0:0,  alto:28 },   // grande inferior
@@ -79,7 +83,7 @@ const MODELO = {
     ["Frentes grandes", "28 cm × 2"],
     (TIPO_TIRADOR === "asa"
        ? ["Tirador (asa)",   "12,5 cm e/c"]
-       : ["Tirador (uñero)", "perfil J · todo el ancho"])
+       : ["Tirador (uñero)", "perfil 2,7 cm · recorta puerta"])
   ],
   piezas: [
     // ── Caja (60 × 70 × 58, casco espesor 1,6) ────────────
@@ -164,28 +168,31 @@ function tiradores(){
   for (const f of FRENTES){
     const yTop = f.y0 + f.alto;
     if (TIPO_TIRADOR === "asa") out.push(...tiradorAsa(yTop - 5));
-    else                        out.push(...tiradorUnero(yTop - JUNTA_FRENTE));
+    else                        out.push(...tiradorUnero(yTop));
   }
   return out;
 }
 
-// Perfil tipo "J" (uñero / falsa gola) de aluminio, a todo el ancho del frente,
-// montado en su borde superior `yTop`. Sección J en el plano Y-Z:
-//   alma vertical (atornillada por detrás del frente) · coronación horizontal
-//   superior · labio frontal que baja → hueco para los dedos por encima.
+// Perfil uñero de aluminio (falsa gola), a todo el ancho del frente. Ocupa la
+// franja superior de UNERO_ALTO cm (la puerta se recortó esa cota): cara frontal
+// enrasada con el frente, sube por encima de la puerta y curva hacia atrás
+// formando el hueco para los dedos. `yTop` = borde superior nominal del frente.
 function tiradorUnero(yTop, ancho = 59.6, x0 = 0.2){
-  const al = "#b9bdc3";                 // aluminio
-  const e = 0.2;                        // espesor de pared del perfil
-  const zCara = -1.9;                   // cara frontal del frente
-  const zLabio = zCara - 0.5;           // labio asoma 0,5 cm por delante
-  const mat = { color:al, metal:0.8, rough:0.3 };
+  const al = "#c8ccd0";                 // aluminio anodizado claro
+  const e = 0.25;                       // espesor de pared del perfil
+  const zCara = -1.9;                   // cara frontal del frente (puerta)
+  const zTras = 0;                      // cara trasera de la puerta
+  const yBase = yTop - UNERO_ALTO;       // arranque del perfil = nuevo top de puerta
+  const mat = { color:al, metal:0.7, rough:0.35 };
   return [
-    // alma vertical pegada a la cara interior del frente (z = 0 → e)
-    { nombre:"Uñero alma",       pos:[x0, yTop - 5,   0],      size:[ancho, 5, e],                 ...mat },
-    // coronación horizontal superior (de la cara interior al labio frontal)
-    { nombre:"Uñero coronación", pos:[x0, yTop,       zLabio], size:[ancho, e, (0 + e) - zLabio],  ...mat },
-    // labio frontal que baja (la curva de la J)
-    { nombre:"Uñero labio",      pos:[x0, yTop - 1.6, zLabio], size:[ancho, 1.6, e],               ...mat }
+    // cara frontal enrasada con el frente, cubriendo la franja del perfil
+    { nombre:"Uñero frente", pos:[x0, yBase, zCara],      size:[ancho, UNERO_ALTO, e],        ...mat },
+    // pared trasera que sube por detrás de la puerta (un poco más alta)
+    { nombre:"Uñero trasera", pos:[x0, yBase, zTras - e], size:[ancho, UNERO_ALTO + 0.3, e],  ...mat },
+    // coronación superior: une frente y trasera por arriba (tapa del perfil)
+    { nombre:"Uñero techo", pos:[x0, yTop, zCara],        size:[ancho, e, (zTras) - zCara],   ...mat },
+    // labio que vuela hacia delante (se hooka con los dedos desde el frente-arriba)
+    { nombre:"Uñero labio", pos:[x0, yTop - e, zCara],    size:[ancho, e, 0.9],               ...mat }
   ];
 }
 
@@ -270,8 +277,11 @@ for (const p of MODELO.piezas){
     continue;
   }
 
-  // Frente/puerta: descuento de junta en alto, anclado abajo (pos.y intacta)
-  const sy2 = p.frente ? sy - JUNTA_FRENTE : sy;
+  // Frente/puerta: recorte en alto, anclado abajo (pos.y intacta).
+  //  · asa  → solo la junta de 0,2 cm
+  //  · uñero → se recorta el alto del perfil (2,7) para alojarlo arriba
+  const recorte = (TIPO_TIRADOR === "unero") ? UNERO_ALTO : JUNTA_FRENTE;
+  const sy2 = p.frente ? sy - recorte : sy;
   const geo = (p.forma === "cilindro")
     ? new THREE.CylinderGeometry(p.rTop ?? sx/2, p.rBot ?? sx/2, sy, p.seg ?? 24)  // eje Y; rTop/rBot → cono
     : new THREE.BoxGeometry(sx, sy2, sz);
