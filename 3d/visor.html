@@ -92,16 +92,24 @@ const MODELO = {
 
 // Cuatro patas niveladoras de cocina (malla STL real); centro a `inset` cm.
 // Devuelve marcadores forma:"stl"; la malla se instancia en el bucle de piezas.
+// El saliente de la placa (en +X de la malla) se orienta hacia el costado más
+// cercano: patas del lado izquierdo giran 180º (saliente hacia -X).
 function patasMueble(ancho, fondo, alto, inset = 7.5){
   const out = [];
-  for (const x of [inset, ancho - inset])
+  for (const x of [inset, ancho - inset]){
+    const rotY = (x < ancho / 2) ? Math.PI : 0;   // izquierda → saliente a -X
     for (const z of [inset, fondo - inset])
-      out.push({ nombre:"Pata", forma:"stl", base:true, alto, pos:[x, 0, z], size:[0,0,0] });
+      out.push({ nombre:"Pata", forma:"stl", base:true, alto, rotY, pos:[x, 0, z], size:[0,0,0] });
+  }
   return out;
 }
 
+// Cuánto se introduce el remate superior de la pata dentro del suelo del mueble
+const PATA_PENETRACION = 1.6;   // ≈ espesor del suelo
+
 // Carga la malla STL de la pata, la orienta (pie abajo) y la normaliza:
-// minY = 0, centrada en X/Z, escalada uniformemente a `altoObjetivo` cm.
+// el EJE DEL PIE (no el bounding box, que el saliente descentra) queda en X=Z=0,
+// pie apoyado en y=0, escalada uniformemente a `altoObjetivo` cm.
 // Devuelve la BufferGeometry lista para clonar, o null si falla la carga.
 async function cargarGeoPata(url, altoObjetivo){
   try {
@@ -109,11 +117,20 @@ async function cargarGeoPata(url, altoObjetivo){
     geo.computeBoundingBox();
     const b = geo.boundingBox;
     const altoSTL = b.max.y - b.min.y;
+    // Centro del PIE (rebanada inferior): el husillo/pie son redondos y marcan el eje
+    const pos = geo.attributes.position;
+    const yCorte = b.min.y + 0.12 * altoSTL;
+    let mnx = 1e9, mxx = -1e9, mnz = 1e9, mxz = -1e9;
+    for (let i = 0; i < pos.count; i++){
+      if (pos.getY(i) > yCorte) continue;
+      const x = pos.getX(i), z = pos.getZ(i);
+      if (x < mnx) mnx = x; if (x > mxx) mxx = x;
+      if (z < mnz) mnz = z; if (z > mxz) mxz = z;
+    }
+    const ejeX = (mnx + mxx) / 2;
+    const ejeZ = (mnz + mxz) / 2;
     const s = altoObjetivo / altoSTL;            // escala uniforme (no deforma)
-    // centrar en X/Z y apoyar la base en y=0, luego escalar
-    const cx = (b.min.x + b.max.x) / 2;
-    const cz = (b.min.z + b.max.z) / 2;
-    geo.translate(-cx, -b.min.y, -cz);
+    geo.translate(-ejeX, -b.min.y, -ejeZ);       // eje del pie al origen, base en y=0
     geo.scale(s, s, s);
     geo.computeVertexNormals();
     return geo;
@@ -177,8 +194,9 @@ const colCanto = new THREE.Color(MODELO.canto || "#5a4a2e");
 
 const elev = MODELO.elevacion || 0;     // las patas suben el cuerpo
 
-// Malla real de la pata (STL) — se clona en cada esquina; null si no carga
-const pataGeo = await cargarGeoPata("pata.stl", elev || 15.5);
+// Malla real de la pata (STL) — se clona en cada esquina; null si no carga.
+// Se escala un poco más alta (penetración) para que el remate entre en el suelo.
+const pataGeo = await cargarGeoPata("pata.stl", (elev || 15.5) + PATA_PENETRACION);
 const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
 
 for (const p of MODELO.piezas){
@@ -190,7 +208,8 @@ for (const p of MODELO.piezas){
   if (p.forma === "stl"){
     if (pataGeo){
       const m = new THREE.Mesh(pataGeo, matPata);
-      m.position.set(px, 0, pz);         // pos = centro X/Z de la pata, base en y=0
+      m.rotation.y = p.rotY || 0;        // saliente hacia el costado más cercano
+      m.position.set(px, 0, pz);         // eje del pie en (px,pz), base en y=0
       grupo.add(m);
     } else {                              // fallback: cilindro simple
       const d = 5, h = p.alto || 15.5;
