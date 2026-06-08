@@ -136,8 +136,12 @@ Generadas con `baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda)`.
 
 ## 12. Bisagras de cazoleta + animación de puerta
 
-Bisagra europea **cazoleta Ø35, codo 0** modelada paramétricamente (no se importa el
-SolidWorks; si se exporta un `bisagra.stl` se cargaría como la pata). `construirBisagras(pv)`.
+Bisagra europea **cazoleta Ø35, codo 0**. Se usa la **malla real** `bisagra.stl`
+(ensamblaje SolidWorks → STL vía **Onshape**: importar el `.SLDASM`+piezas en un zip,
+Export → STL binario en mm). `cargarGeoBisagra` la pasa a cm y la centra; si el archivo
+no está, `construirBisagras(pv)` cae a una versión **paramétrica** (cazoleta+alas+codo+
+pletina). Orientación/posición afinables con `BISAGRA_SCALE`, `BISAGRA_ROT` (XYZ rad) y
+`BISAGRA_OFF` (cm). La bisagra completa acompaña a la puerta (rígida).
 
 - **Lado de bisagras = opuesto al tirador** (`HINGE_LADO`). Para "puerta izquierda"
   (tirador izq) → bisagras a la **derecha**.

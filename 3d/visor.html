@@ -104,6 +104,12 @@ const ANGULO_ABIERTO = (HINGE_LADO === "der" ? -1 : 1) * 100 * Math.PI/180;  // 
 const CUP_X  = (HINGE_LADO === "der") ? (ANCHO - 0.2 - 2.2) : (0.2 + 2.2);   // centro cazoleta (2,2 cm del canto)
 const CUPS_Y = [10, ALTO - 10];   // 2 bisagras: a 10 cm de cada extremo
 
+// Ajuste de la malla REAL de la bisagra (STL de SolidWorks, importado vía Onshape).
+// Se afina mirando el visor: escala extra, rotación XYZ (rad) y desplazamiento (cm).
+const BISAGRA_SCALE = 1.0;
+const BISAGRA_ROT   = [Math.PI/2, -Math.PI/2, 0];
+const BISAGRA_OFF   = [0, 0, 3];
+
 const MODELO = {
   nombre: "Bajo puerta izquierda",
   nota: "1 puerta (izq) · 1 balda · 60 × 70 × 58 cm",
@@ -210,6 +216,23 @@ async function cargarGeoPata(url, altoObjetivo){
     return geo;
   } catch (e) {
     console.warn("No se pudo cargar la pata STL:", e);
+    return null;
+  }
+}
+
+// Carga la bisagra STL real (mm), la pasa a cm y la centra en su bounding box.
+// Devuelve la BufferGeometry, o null si no existe (se usará la versión paramétrica).
+async function cargarGeoBisagra(url){
+  try {
+    const geo = await new STLLoader().loadAsync(url);
+    geo.scale(0.1, 0.1, 0.1);                          // mm → cm
+    geo.computeBoundingBox();
+    const c = geo.boundingBox.getCenter(new THREE.Vector3());
+    geo.translate(-c.x, -c.y, -c.z);                   // centrada en su centro geométrico
+    geo.computeVertexNormals();
+    return geo;
+  } catch (e) {
+    console.warn("No se pudo cargar la bisagra STL:", e);
     return null;
   }
 }
@@ -332,6 +355,9 @@ const pataGeo = await cargarGeoPata("pata.stl", (elev || 15.5) + PATA_PENETRACIO
 const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
 const matAlu  = new THREE.MeshStandardMaterial({ color:0xc8ccd0, roughness:0.35, metalness:0.65 });
 
+// Malla real de la bisagra (STL de SolidWorks vía Onshape); null → usa paramétrica.
+const bisagraGeo = await cargarGeoBisagra("bisagra.stl");
+
 let size = new THREE.Vector3();   // dimensiones del conjunto (para encuadrar cámara)
 let grid = null;                  // suelo de referencia (se rehace en cada build)
 
@@ -360,6 +386,20 @@ function addConCanto(geo, mat, pos, conCanto = true, target = grupo){
 // pletina + brazo + leva quedan fijas en el costado (`grupo`). `pv` = eje de giro.
 function construirBisagras(pv){
   const ladoDer = HINGE_LADO === "der";
+
+  // ── Versión con malla REAL (STL) ──
+  if (bisagraGeo){
+    for (const yc of CUPS_Y){
+      const m = new THREE.Mesh(bisagraGeo, matAlu);
+      m.scale.setScalar(BISAGRA_SCALE * (ladoDer ? 1 : 1));
+      m.rotation.set(BISAGRA_ROT[0], BISAGRA_ROT[1], BISAGRA_ROT[2]);
+      m.position.set(CUP_X + BISAGRA_OFF[0] - pv.x, yc + elev + BISAGRA_OFF[1], BISAGRA_OFF[2] - pv.z);
+      puertaPivot.add(m);   // la bisagra completa acompaña a la puerta
+    }
+    return;
+  }
+
+  // ── Versión paramétrica (si no hay STL) ──
   const plX = ladoDer ? (ANCHO - EC - 0.3) : (EC + 0.3);   // pletina contra cara interior del costado
   const codoX = CUP_X + (ladoDer ? 0.3 : -0.3);
   for (const yc of CUPS_Y){
