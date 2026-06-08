@@ -136,12 +136,19 @@ Generadas con `baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda)`.
 
 ## 12. Bisagras de cazoleta + animación de puerta
 
-Bisagra europea **cazoleta Ø35, codo 0**. Se usa la **malla real** `bisagra.stl`
-(ensamblaje SolidWorks → STL vía **Onshape**: importar el `.SLDASM`+piezas en un zip,
-Export → STL binario en mm). `cargarGeoBisagra` la pasa a cm y la centra; si el archivo
-no está, `construirBisagras(pv)` cae a una versión **paramétrica** (cazoleta+alas+codo+
-pletina). Orientación/posición afinables con `BISAGRA_SCALE`, `BISAGRA_ROT` (XYZ rad) y
-`BISAGRA_OFF` (cm). La bisagra completa acompaña a la puerta (rígida).
+Bisagra europea **cazoleta Ø35, codo 0**, malla real de SolidWorks → STL vía **Onshape**
+(importar `.SLDASM`+piezas en zip → Export STL binario mm). El STL se **parte en 2** por
+el eje X del herraje (umbral −42 mm): **`bisagra_casco.stl`** (pletina/base, X<−42) y
+**`bisagra_puerta.stl`** (cazoleta+brazo, X>−42). Ambas se centran por el MISMO punto
+`BIS_CENTRO` para conservar su posición relativa.
+
+- **Pletina (casco):** fija al costado → va en `grupo`.
+- **Cazoleta+brazo (puerta):** giran con la puerta → van en un sub-grupo `bisP`
+  (hijo de `puertaPivot`) **pre-rotado `−ANGULO_ABIERTO`**. Así, al abrir la puerta
+  (`puertaPivot → ANGULO_ABIERTO`) la cazoleta coincide con la pletina (hinge montada),
+  y la cazoleta sigue metida en la puerta en todo el recorrido. El STL está en pose
+  **abierta**, por eso el estado ABIERTO es el de referencia (`M` = `BISAGRA_ROT`+`OFF`
+  se afina mirando la puerta abierta). Si faltan los STL → versión paramétrica.
 
 - **Lado de bisagras = opuesto al tirador** (`HINGE_LADO`). Para "puerta izquierda"
   (tirador izq) → bisagras a la **derecha**.

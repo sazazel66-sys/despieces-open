@@ -220,15 +220,16 @@ async function cargarGeoPata(url, altoObjetivo){
   }
 }
 
-// Carga la bisagra STL real (mm), la pasa a cm y la centra en su bounding box.
-// Devuelve la BufferGeometry, o null si no existe (se usará la versión paramétrica).
+// Centro del ENSAMBLAJE completo de la bisagra (cm). Ambas mitades (casco y puerta)
+// se centran por este MISMO punto para que conserven su posición relativa y encajen.
+const BIS_CENTRO = new THREE.Vector3(-1.82, 1.965, 4.76);
+
+// Carga una mitad de la bisagra STL (mm), la pasa a cm y la centra por BIS_CENTRO.
 async function cargarGeoBisagra(url){
   try {
     const geo = await new STLLoader().loadAsync(url);
     geo.scale(0.1, 0.1, 0.1);                          // mm → cm
-    geo.computeBoundingBox();
-    const c = geo.boundingBox.getCenter(new THREE.Vector3());
-    geo.translate(-c.x, -c.y, -c.z);                   // centrada en su centro geométrico
+    geo.translate(-BIS_CENTRO.x, -BIS_CENTRO.y, -BIS_CENTRO.z);
     geo.computeVertexNormals();
     return geo;
   } catch (e) {
@@ -355,8 +356,9 @@ const pataGeo = await cargarGeoPata("pata.stl", (elev || 15.5) + PATA_PENETRACIO
 const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
 const matAlu  = new THREE.MeshStandardMaterial({ color:0xc8ccd0, roughness:0.35, metalness:0.65 });
 
-// Malla real de la bisagra (STL de SolidWorks vía Onshape); null → usa paramétrica.
-const bisagraGeo = await cargarGeoBisagra("bisagra.stl");
+// Bisagra real partida en 2: pletina (casco, fija) y cazoleta+brazo (puerta, gira).
+const bisagraCascoGeo  = await cargarGeoBisagra("bisagra_casco.stl");
+const bisagraPuertaGeo = await cargarGeoBisagra("bisagra_puerta.stl");
 
 let size = new THREE.Vector3();   // dimensiones del conjunto (para encuadrar cámara)
 let grid = null;                  // suelo de referencia (se rehace en cada build)
@@ -387,14 +389,32 @@ function addConCanto(geo, mat, pos, conCanto = true, target = grupo){
 function construirBisagras(pv){
   const ladoDer = HINGE_LADO === "der";
 
-  // ── Versión con malla REAL (STL) ──
-  if (bisagraGeo){
+  // ── Versión con malla REAL partida en 2 ──
+  // `M` = colocación del conjunto en el estado ABIERTO (cazoleta en la puerta,
+  // pletina en el costado). La pletina (casco) queda fija ahí. La cazoleta+brazo
+  // van en un sub-pivote pre-rotado −ANGULO_ABIERTO, de modo que al abrir la puerta
+  // (puertaPivot → ANGULO_ABIERTO) coinciden con la pletina, y al cerrar acompañan
+  // a la puerta (la cazoleta sigue metida en la puerta en todo momento).
+  if (bisagraPuertaGeo || bisagraCascoGeo){
+    const bisP = new THREE.Group();
+    bisP.rotation.y = -ANGULO_ABIERTO;
+    puertaPivot.add(bisP);
     for (const yc of CUPS_Y){
-      const m = new THREE.Mesh(bisagraGeo, matAlu);
-      m.scale.setScalar(BISAGRA_SCALE * (ladoDer ? 1 : 1));
-      m.rotation.set(BISAGRA_ROT[0], BISAGRA_ROT[1], BISAGRA_ROT[2]);
-      m.position.set(CUP_X + BISAGRA_OFF[0] - pv.x, yc + elev + BISAGRA_OFF[1], BISAGRA_OFF[2] - pv.z);
-      puertaPivot.add(m);   // la bisagra completa acompaña a la puerta
+      const P = [CUP_X + BISAGRA_OFF[0], yc + elev + BISAGRA_OFF[1], BISAGRA_OFF[2]];
+      if (bisagraCascoGeo){                       // pletina → fija al casco
+        const m = new THREE.Mesh(bisagraCascoGeo, matAlu);
+        m.scale.setScalar(BISAGRA_SCALE);
+        m.rotation.set(BISAGRA_ROT[0], BISAGRA_ROT[1], BISAGRA_ROT[2]);
+        m.position.set(P[0], P[1], P[2]);
+        grupo.add(m);
+      }
+      if (bisagraPuertaGeo){                       // cazoleta+brazo → con la puerta
+        const m = new THREE.Mesh(bisagraPuertaGeo, matAlu);
+        m.scale.setScalar(BISAGRA_SCALE);
+        m.rotation.set(BISAGRA_ROT[0], BISAGRA_ROT[1], BISAGRA_ROT[2]);
+        m.position.set(P[0] - pv.x, P[1], P[2] - pv.z);
+        bisP.add(m);
+      }
     }
     return;
   }
