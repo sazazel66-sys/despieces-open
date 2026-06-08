@@ -134,7 +134,32 @@ Generadas con `baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda)`.
   (`tiradores()`); el resto (carcasa, baldas, patas) se mantiene. Útil para ver el
   interior y la colocación de baldas.
 
-## 12. Pendiente (fase 2)
+## 12. Bisagras de cazoleta + animación de puerta
+
+Bisagra europea **cazoleta Ø35, codo 0** modelada paramétricamente (no se importa el
+SolidWorks; si se exporta un `bisagra.stl` se cargaría como la pata). `construirBisagras(pv)`.
+
+- **Lado de bisagras = opuesto al tirador** (`HINGE_LADO`). Para "puerta izquierda"
+  (tirador izq) → bisagras a la **derecha**.
+- **2 bisagras** a `CUPS_Y = [10, alto−10]` (10 cm de cada extremo).
+- **Cazoleta** Ø3,5 cm, prof 1,2 cm, centro a **2,2 cm del canto** de la puerta
+  (`CUP_X`), embebida en la cara interior (z 0..−1,2). Lleva 2 alas con tornillo.
+- **Codo** sale de la cazoleta hacia el interior; **pletina + brazo + leva** van
+  atornillados a la cara interior del costado (fijos).
+- **Solidario a la puerta** (`mov:true`): puerta, tiradores, cazoleta, alas y codo →
+  van dentro de `puertaPivot`, restándoles el pivote. **Fijos**: carcasa, baldas,
+  patas, pletina, brazo, leva.
+
+**Eje de giro / animación:**
+- `puertaPivot` (THREE.Group) pivota sobre `(PIVOT_X, *, PIVOT_Z)` = canto de la puerta
+  del lado de bisagras, cara frontal. Es una aproximación de un solo eje (la bisagra
+  real es un 4 barras, pero visualmente abre como una puerta normal).
+- `ANGULO_ABIERTO` ≈ ±100° (signo según lado). El bucle `animate` suaviza
+  `anguloPuerta → anguloObjetivo` (factor 0,14).
+- Botón **`#btnAbrir`** ("Abrir/Cerrar puerta"). Si la puerta está oculta, al abrir se
+  vuelve a mostrar. `poblarGrupo` recrea `puertaPivot` y reaplica `anguloPuerta`.
+
+## 13. Pendiente (fase 2)
 
 - Mecanizaciones (taladros porta-estantes como agujeros reales en los costados,
   ranuras, cajeados, guías).

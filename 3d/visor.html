@@ -19,15 +19,16 @@
   #medidas td{padding:1px 0}
   #medidas td.k{color:#889;padding-right:10px;white-space:nowrap}
   #medidas td.v{font-weight:600;text-align:right;white-space:nowrap}
-  /* Botones de la UI (alternar tirador / puerta) */
-  #btnTirador,#btnPuerta{position:fixed;left:12px;z-index:7;
+  /* Botones de la UI (abrir / tirador / puerta) */
+  #btnTirador,#btnPuerta,#btnAbrir{position:fixed;left:12px;z-index:7;
     font:600 12px system-ui,sans-serif;color:#2b3340;
     background:rgba(255,255,255,.92);border:1px solid #c3c9d2;border-radius:7px;
     padding:8px 13px;cursor:pointer;box-shadow:0 1px 5px rgba(40,50,70,.15)}
   #btnTirador{bottom:34px}
   #btnPuerta{bottom:70px}
-  #btnTirador:hover,#btnPuerta:hover{background:#fff}
-  #btnTirador:active,#btnPuerta:active{transform:translateY(1px)}
+  #btnAbrir{bottom:106px}
+  #btnTirador:hover,#btnPuerta:hover,#btnAbrir:hover{background:#fff}
+  #btnTirador:active,#btnPuerta:active,#btnAbrir:active{transform:translateY(1px)}
 </style>
 <script type="importmap">
 {
@@ -43,6 +44,7 @@
 <div id="sub"></div>
 <div id="medidas"></div>
 <div id="hint">Arrastra para girar · pellizca para zoom · dos dedos para mover</div>
+<button id="btnAbrir">Abrir puerta</button>
 <button id="btnPuerta">Puerta: visible</button>
 <button id="btnTirador">Tirador: uñero</button>
 <canvas id="c"></canvas>
@@ -92,6 +94,16 @@ const FRENTES = [
   { y0:0, alto:ALTO, puerta:true, lado:"izq" }
 ];
 
+// ── Bisagras de cazoleta (Ø35, codo 0) ───────────────────────────────────────
+// Las bisagras van en el lado OPUESTO al tirador. La puerta pivota sobre el eje
+// vertical de ese lado (esquina frontal del costado de bisagras).
+const HINGE_LADO = (FRENTES[0].lado === "izq") ? "der" : "izq";   // opuesto al tirador
+const PIVOT_X = (HINGE_LADO === "der") ? (ANCHO - 0.2) : 0.2;     // canto de la puerta (lado bisagras)
+const PIVOT_Z = -EP;                                              // cara frontal de la puerta
+const ANGULO_ABIERTO = (HINGE_LADO === "der" ? -1 : 1) * 100 * Math.PI/180;  // ~100°
+const CUP_X  = (HINGE_LADO === "der") ? (ANCHO - 0.2 - 2.2) : (0.2 + 2.2);   // centro cazoleta (2,2 cm del canto)
+const CUPS_Y = [10, ALTO - 10];   // 2 bisagras: a 10 cm de cada extremo
+
 const MODELO = {
   nombre: "Bajo puerta izquierda",
   nota: "1 puerta (izq) · 1 balda · 60 × 70 × 58 cm",
@@ -108,7 +120,8 @@ const MODELO = {
     ["Espesor puerta",  "1,9 cm"],
     ["Trasera",         "a 5 cm del fondo"],
     ["Baldas",          "1 · fondo 50 cm"],
-    ["Balda apoyo",     "+0,5 cm sobre porta-estante"]
+    ["Balda apoyo",     "+0,5 cm sobre porta-estante"],
+    ["Bisagras",        "cazoleta Ø35 · codo 0 · 2 ud"]
     // (la fila del tirador se añade dinámicamente según tipoTirador)
   ],
   piezas: [
@@ -120,7 +133,7 @@ const MODELO = {
     // ── Trasera (encajada a 5 cm del fondo) ───────────────
     { nombre:"Trasera",     pos:[EC,          EC,  TRASERA_Z], size:[ANCHO-2*EC, ALTO-2*EC, 0.5] },
     // ── Puerta izquierda (cerrada, sobresale 1,9 cm) ──────
-    { nombre:"Puerta", frente:true, pos:[0.2, 0, -EP], size:[ANCHO-0.4, ALTO, EP] },
+    { nombre:"Puerta", frente:true, mov:true, pos:[0.2, 0, -EP], size:[ANCHO-0.4, ALTO, EP] },
     // ── Baldas (huecos iguales; apoyan +0,5 cm sobre el porta-estante) ──
     ...baldasMueble(NUM_BALDAS, ANCHO, ALTO, FONDO, EC, TRASERA_Z, FONDO_BALDA),
     // ── Patas (redondas regulables) ───────────────────────
@@ -322,34 +335,85 @@ const matAlu  = new THREE.MeshStandardMaterial({ color:0xc8ccd0, roughness:0.35,
 let size = new THREE.Vector3();   // dimensiones del conjunto (para encuadrar cámara)
 let grid = null;                  // suelo de referencia (se rehace en cada build)
 
+// Puerta animada: subgrupo que pivota sobre el eje de bisagras (las piezas con
+// `mov:true` —puerta, tiradores, cazoleta— van dentro; carcasa/pletina, fuera).
+let puertaPivot = null;
+let anguloPuerta = 0;             // ángulo actual de la puerta (rad)
+let anguloObjetivo = 0;           // ángulo destino (0 = cerrada)
+
 // Añade una malla al grupo, opcionalmente con su contorno de aristas (canto).
 // Si la geometría ya viene trasladada a su sitio, omitir `pos`.
-function addConCanto(geo, mat, pos, conCanto = true){
+function addConCanto(geo, mat, pos, conCanto = true, target = grupo){
   const m = new THREE.Mesh(geo, mat);
   if (pos) m.position.copy(pos);
-  grupo.add(m);
+  target.add(m);
   if (conCanto){
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
       new THREE.LineBasicMaterial({ color: colCanto }));
     if (pos) e.position.copy(pos);
-    grupo.add(e);
+    target.add(e);
+  }
+}
+
+// Construye las 2 bisagras de cazoleta. Las partes solidarias a la puerta
+// (cazoleta + alas + codo) van en `puertaPivot` (restando el pivote `pv`); la
+// pletina + brazo + leva quedan fijas en el costado (`grupo`). `pv` = eje de giro.
+function construirBisagras(pv){
+  const ladoDer = HINGE_LADO === "der";
+  const plX = ladoDer ? (ANCHO - EC - 0.3) : (EC + 0.3);   // pletina contra cara interior del costado
+  const codoX = CUP_X + (ladoDer ? 0.3 : -0.3);
+  for (const yc of CUPS_Y){
+    const yE = yc + elev;
+    // ── Solidario a la puerta (pivota) ──
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.75, 1.2, 28), matAlu);
+    cup.rotation.x = Math.PI/2;                              // eje de la cazoleta → Z
+    cup.position.set(CUP_X - pv.x, yE, -0.6 - pv.z);        // embebida en la puerta (z 0..-1,2)
+    puertaPivot.add(cup);
+    for (const dy of [-2.8, 2.8]){                          // 2 alas con tornillo
+      const ala = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.0, 0.4), matAlu);
+      ala.position.set(CUP_X - pv.x, yE + dy, -0.2 - pv.z);
+      puertaPivot.add(ala);
+    }
+    const codo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 1.8), matAlu);
+    codo.position.set(codoX - pv.x, yE, 0.9 - pv.z);        // codo que sale hacia el interior
+    puertaPivot.add(codo);
+    // ── Fijo en el costado ──
+    const pletina = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.6, 5.0), matAlu);
+    pletina.position.set(plX, yE, 3.2);
+    grupo.add(pletina);
+    const brazo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 3.4), matAlu);
+    brazo.position.set((codoX + plX)/2, yE, 1.7);
+    grupo.add(brazo);
+    const leva = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.6, 16), matAlu);
+    leva.position.set((codoX + plX)/2, yE + 0.9, 2.6);
+    grupo.add(leva);
   }
 }
 
 // (Re)construye el mueble: piezas fijas + tiradores del tipo activo.
 function poblarGrupo(){
-  for (const c of grupo.children)               // liberar geometrías (salvo la pata compartida)
-    if (c.geometry && c.geometry !== pataGeo) c.geometry.dispose();
+  grupo.traverse(o => {                          // liberar geometrías (salvo la pata compartida)
+    if (o.geometry && o.geometry !== pataGeo) o.geometry.dispose();
+  });
   grupo.clear();
   grupo.position.set(0,0,0);
+
+  // Subgrupo que pivota sobre el eje de bisagras; las piezas `mov:true` van dentro.
+  puertaPivot = new THREE.Group();
+  puertaPivot.position.set(PIVOT_X, 0, PIVOT_Z);
+  grupo.add(puertaPivot);
+  const pv = new THREE.Vector3(PIVOT_X, 0, PIVOT_Z);   // pivote a restar a las piezas móviles
 
   // Con la puerta oculta: se omiten frentes y sus tiradores (la balda sí se ve).
   const piezas  = puertaVisible ? MODELO.piezas : MODELO.piezas.filter(p => !p.frente);
   const tiros   = puertaVisible ? tiradores() : [];
+  tiros.forEach(t => t.mov = true);              // los tiradores van con la puerta
   for (const p of [...piezas, ...tiros]){
     const [sx,sy,sz] = p.size;
     const [px,py,pz] = p.pos;
     const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
+    const mov = p.mov === true;            // ¿solidario a la puerta?
+    const tgt = mov ? puertaPivot : grupo; // grupo destino
 
     // ── Pata: instancia de la malla STL (apoyada en y=0, centrada en su pos) ──
     if (p.forma === "stl"){
@@ -375,11 +439,12 @@ function poblarGrupo(){
         { depth: p.ancho, bevelEnabled:false, steps:1, curveSegments:16 });
       geo.rotateY(-Math.PI/2);                                // extrusión (z) → ancho (x)
       geo.translate(p.x0 + p.ancho, oy + yBase - 0.8, -1.6);  // pala al dorso del frente (z=0)
-      grupo.add(new THREE.Mesh(geo, matAlu));
+      if (mov) geo.translate(-pv.x, 0, -pv.z);
+      tgt.add(new THREE.Mesh(geo, matAlu));
       // espiga oculta dentro de la puerta (1 mm más corta por lado: no asoma de lado)
       const sm = new THREE.Mesh(new THREE.BoxGeometry(p.ancho - 0.2, 1.6, 0.4), matAlu);
-      sm.position.set(p.x0 + p.ancho/2, oy + yBase - 1.4, -0.75);
-      grupo.add(sm);
+      sm.position.set(p.x0 + p.ancho/2 - (mov?pv.x:0), oy + yBase - 1.4, -0.75 - (mov?pv.z:0));
+      tgt.add(sm);
       continue;
     }
 
@@ -395,8 +460,9 @@ function poblarGrupo(){
       const g = new THREE.ExtrudeGeometry(sh, { depth: sx, bevelEnabled:false, steps:1 });
       g.rotateY(-Math.PI/2);              // extrusión (z) → ancho (x)
       g.translate(px + sx, oy + py, pz);  // a→z desde pz · b→y desde oy+py
+      if (mov) g.translate(-pv.x, 0, -pv.z);
       addConCanto(g, new THREE.MeshStandardMaterial({
-        color: p.color ? new THREE.Color(p.color) : colTabla, roughness:0.95 }));
+        color: p.color ? new THREE.Color(p.color) : colTabla, roughness:0.95 }), null, true, tgt);
       continue;
     }
 
@@ -408,8 +474,14 @@ function poblarGrupo(){
     const mat = new THREE.MeshStandardMaterial({
       color: p.color ? new THREE.Color(p.color) : colTabla,
       roughness: p.rough ?? 0.95, metalness: p.metal ?? 0.0 });
-    addConCanto(geo, mat, new THREE.Vector3(px + sx/2, oy + py + sy2/2, pz + sz/2), !p.sinCanto);
+    const c = new THREE.Vector3(px + sx/2, oy + py + sy2/2, pz + sz/2);
+    if (mov) c.sub(pv);
+    addConCanto(geo, mat, c, !p.sinCanto, tgt);
   }
+
+  // Bisagras de cazoleta (solo con la puerta presente)
+  if (puertaVisible) construirBisagras(pv);
+  puertaPivot.rotation.y = anguloPuerta;          // mantiene el ángulo actual al reconstruir
 
   // Centrar el conjunto en el origen y (re)colocar el suelo de referencia
   const box = new THREE.Box3().setFromObject(grupo);
@@ -478,6 +550,20 @@ btnPuerta.addEventListener('click', () => {
 });
 actualizarBotonPuerta();
 
+// Botón: anima la puerta abrir ⇄ cerrar (girando sobre el eje de bisagras)
+const btnAbrir = document.getElementById('btnAbrir');
+let abierta = false;
+function actualizarBotonAbrir(){
+  btnAbrir.textContent = abierta ? "Cerrar puerta" : "Abrir puerta";
+}
+btnAbrir.addEventListener('click', () => {
+  if (!puertaVisible){ puertaVisible = true; poblarGrupo(); actualizarBotonPuerta(); }
+  abierta = !abierta;
+  anguloObjetivo = abierta ? ANGULO_ABIERTO : 0;
+  actualizarBotonAbrir();
+});
+actualizarBotonAbrir();
+
 // Resize
 function resize(){
   renderer.setSize(innerWidth, innerHeight, false);
@@ -490,6 +576,11 @@ resize();
 // Loop
 (function animate(){
   requestAnimationFrame(animate);
+  // Suaviza la puerta hacia su ángulo objetivo (abrir/cerrar)
+  if (puertaPivot && Math.abs(anguloObjetivo - anguloPuerta) > 1e-4){
+    anguloPuerta += (anguloObjetivo - anguloPuerta) * 0.14;
+    puertaPivot.rotation.y = anguloPuerta;
+  }
   controls.update();
   renderer.render(scene, camera);
 })();
