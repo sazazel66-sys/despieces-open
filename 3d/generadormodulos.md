@@ -112,10 +112,11 @@ Ejemplo (60 × 70 × 58):
 
 Generadas con `baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda)`.
 
-- **Huecos iguales contando suelo y techo:** el interior `alto − 2·EC` se reparte en
-  `num + 1` tramos iguales. Cada línea divisoria es la **altura del porta-estante**
-  (mecanización): `yLínea(i) = EC + i · (alto − 2·EC)/(num+1)`, `i = 1..num`.
-  - Ejemplo 1 balda en bajo 70: `yLínea = 1,6 + 33,4 = 35 cm`.
+- **Huecos iguales dividiendo el COSTADO completo** (de `y=0` a `y=alto`, no solo el
+  interior): se reparte en `num + 1` tramos iguales. Cada línea divisoria es la
+  **altura del porta-estante** (mecanización): `yLínea(i) = i · alto/(num+1)`, `i = 1..num`.
+  - Ejemplo 1 balda en bajo 70: `yLínea = 70/2 = 35 cm` (mitad justa del costado).
+  - Ejemplo 2 baldas: `23,33` y `46,67 cm`.
 - **La balda apoya 0,5 cm por encima** de esa línea → la **cara inferior** de la balda
   está en `yLínea + 0,5`. (`pos.y = yLínea + 0,5`).
 - **Espesor** de balda = `EC` (mismo tablero que el casco).

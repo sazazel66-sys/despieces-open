@@ -143,7 +143,7 @@ function baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda){
   const x0    = ec + (anchoInt - anchoBalda)/2;   // centrada a lo ancho
   const zBalda = traseraZ - fondoBalda;           // apoyada en la trasera
   for (let i = 1; i <= num; i++){
-    const yLinea = ec + i * (alto - 2*ec) / (num + 1);   // porta-estante (hueco igual)
+    const yLinea = i * alto / (num + 1);   // división del COSTADO completo (0..alto): huecos iguales
     out.push({ nombre:"Balda", pos:[x0, yLinea + 0.5, zBalda], size:[anchoBalda, ec, fondoBalda] });
   }
   return out;
