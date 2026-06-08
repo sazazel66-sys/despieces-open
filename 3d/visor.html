@@ -109,6 +109,10 @@ const CUPS_Y = [10, ALTO - 10];   // 2 bisagras: a 10 cm de cada extremo
 const BISAGRA_SCALE = 1.0;
 const BISAGRA_ROT   = [Math.PI/2, 0, 0];
 const BISAGRA_OFF   = [-5, 0, 0.2];
+// Plegado del brazo: al cerrar (puerta a 0) el brazo gira este ángulo sobre un eje
+// vertical para recogerse hacia la cazoleta; al abrir vuelve a 0 (extendido).
+const BIS_FOLD_ANG  = -1.4;            // rad (negativo = se pliega hacia la cazoleta)
+const BIS_FOLD_PIV  = [0, 0, 0];       // ajuste fino del eje de plegado (cm)
 
 const MODELO = {
   nombre: "Bajo puerta izquierda",
@@ -356,9 +360,11 @@ const pataGeo = await cargarGeoPata("pata.stl", (elev || 15.5) + PATA_PENETRACIO
 const matPata = new THREE.MeshStandardMaterial({ color:0x34373b, roughness:0.55, metalness:0.25 });
 const matAlu  = new THREE.MeshStandardMaterial({ color:0xc8ccd0, roughness:0.35, metalness:0.65 });
 
-// Bisagra real partida en 2: pletina (casco, fija) y cazoleta+brazo (puerta, gira).
-const bisagraCascoGeo  = await cargarGeoBisagra("bisagra_casco.stl");
-const bisagraPuertaGeo = await cargarGeoBisagra("bisagra_puerta.stl");
+// Bisagra real partida en 3: pletina (fija al casco), cazoleta (en la puerta) y
+// brazo (se pliega al cerrar, recogiéndose hacia la cazoleta).
+const bisagraCascoGeo    = await cargarGeoBisagra("bisagra_casco.stl");      // pletina (fija)
+const bisagraCazoletaGeo = await cargarGeoBisagra("bisagra_cazoleta.stl");   // cazoleta (con puerta)
+const bisagraBrazoGeo    = await cargarGeoBisagra("bisagra_brazo.stl");      // brazo (se pliega)
 
 let size = new THREE.Vector3();   // dimensiones del conjunto (para encuadrar cámara)
 let grid = null;                  // suelo de referencia (se rehace en cada build)
@@ -368,6 +374,7 @@ let grid = null;                  // suelo de referencia (se rehace en cada buil
 let puertaPivot = null;
 let anguloPuerta = 0;             // ángulo actual de la puerta (rad)
 let anguloObjetivo = 0;           // ángulo destino (0 = cerrada)
+let bisagraFolds = [];            // grupos del brazo que se pliegan (se animan por frame)
 
 // Añade una malla al grupo, opcionalmente con su contorno de aristas (canto).
 // Si la geometría ya viene trasladada a su sitio, omitir `pos`.
@@ -395,25 +402,37 @@ function construirBisagras(pv){
   // van en un sub-pivote pre-rotado −ANGULO_ABIERTO, de modo que al abrir la puerta
   // (puertaPivot → ANGULO_ABIERTO) coinciden con la pletina, y al cerrar acompañan
   // a la puerta (la cazoleta sigue metida en la puerta en todo momento).
-  if (bisagraPuertaGeo || bisagraCascoGeo){
-    const bisP = new THREE.Group();
+  if (bisagraCazoletaGeo || bisagraCascoGeo || bisagraBrazoGeo){
+    bisagraFolds = [];
+    const R = BISAGRA_ROT;
+    const bisP = new THREE.Group();               // sigue a la puerta (alineado en abierto)
     bisP.rotation.y = -ANGULO_ABIERTO;
     puertaPivot.add(bisP);
     for (const yc of CUPS_Y){
-      const P = [CUP_X + BISAGRA_OFF[0], yc + elev + BISAGRA_OFF[1], BISAGRA_OFF[2]];
-      if (bisagraCascoGeo){                       // pletina → fija al casco
+      const P  = [CUP_X + BISAGRA_OFF[0], yc + elev + BISAGRA_OFF[1], BISAGRA_OFF[2]];
+      const Pl = [P[0] - pv.x, P[1], P[2] - pv.z];   // mismo punto en coords de bisP
+      if (bisagraCascoGeo){                          // pletina → fija al casco
         const m = new THREE.Mesh(bisagraCascoGeo, matAlu);
-        m.scale.setScalar(BISAGRA_SCALE);
-        m.rotation.set(BISAGRA_ROT[0], BISAGRA_ROT[1], BISAGRA_ROT[2]);
+        m.scale.setScalar(BISAGRA_SCALE); m.rotation.set(R[0], R[1], R[2]);
         m.position.set(P[0], P[1], P[2]);
         grupo.add(m);
       }
-      if (bisagraPuertaGeo){                       // cazoleta+brazo → con la puerta
-        const m = new THREE.Mesh(bisagraPuertaGeo, matAlu);
-        m.scale.setScalar(BISAGRA_SCALE);
-        m.rotation.set(BISAGRA_ROT[0], BISAGRA_ROT[1], BISAGRA_ROT[2]);
-        m.position.set(P[0] - pv.x, P[1], P[2] - pv.z);
+      if (bisagraCazoletaGeo){                       // cazoleta → con la puerta
+        const m = new THREE.Mesh(bisagraCazoletaGeo, matAlu);
+        m.scale.setScalar(BISAGRA_SCALE); m.rotation.set(R[0], R[1], R[2]);
+        m.position.set(Pl[0], Pl[1], Pl[2]);
         bisP.add(m);
+      }
+      if (bisagraBrazoGeo){                          // brazo → se pliega sobre un eje vertical
+        const Jp = [Pl[0] + BIS_FOLD_PIV[0], Pl[1] + BIS_FOLD_PIV[1], Pl[2] + BIS_FOLD_PIV[2]];
+        const fold = new THREE.Group();
+        fold.position.set(Jp[0], Jp[1], Jp[2]);
+        bisP.add(fold);
+        const m = new THREE.Mesh(bisagraBrazoGeo, matAlu);
+        m.scale.setScalar(BISAGRA_SCALE); m.rotation.set(R[0], R[1], R[2]);
+        m.position.set(Pl[0] - Jp[0], Pl[1] - Jp[1], Pl[2] - Jp[2]);
+        fold.add(m);
+        bisagraFolds.push(fold);
       }
     }
     return;
@@ -640,6 +659,12 @@ resize();
   if (puertaPivot && Math.abs(anguloObjetivo - anguloPuerta) > 1e-4){
     anguloPuerta += (anguloObjetivo - anguloPuerta) * 0.14;
     puertaPivot.rotation.y = anguloPuerta;
+  }
+  // Plegado del brazo de la bisagra: t=1 abierta (extendido) · t=0 cerrada (plegado)
+  if (bisagraFolds.length){
+    const t = ANGULO_ABIERTO !== 0 ? anguloPuerta / ANGULO_ABIERTO : 1;
+    const fold = (1 - t) * BIS_FOLD_ANG;
+    for (const fg of bisagraFolds) fg.rotation.y = fold;
   }
   controls.update();
   renderer.render(scene, camera);

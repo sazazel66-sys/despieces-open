@@ -137,18 +137,22 @@ Generadas con `baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda)`.
 ## 12. Bisagras de cazoleta + animación de puerta
 
 Bisagra europea **cazoleta Ø35, codo 0**, malla real de SolidWorks → STL vía **Onshape**
-(importar `.SLDASM`+piezas en zip → Export STL binario mm). El STL se **parte en 2** por
-el eje X del herraje (umbral −42 mm): **`bisagra_casco.stl`** (pletina/base, X<−42) y
-**`bisagra_puerta.stl`** (cazoleta+brazo, X>−42). Ambas se centran por el MISMO punto
-`BIS_CENTRO` para conservar su posición relativa.
+(importar `.SLDASM`+piezas en zip → Export STL binario mm). El STL se **parte en 3** por
+el eje X del herraje: **`bisagra_casco.stl`** (pletina/base, X<−42), **`bisagra_brazo.stl`**
+(brazo, −42≤X<−12) y **`bisagra_cazoleta.stl`** (cazoleta+orejas, X≥−12). Las 3 se centran
+por el MISMO punto `BIS_CENTRO` para conservar su posición relativa.
 
-- **Pletina (casco):** fija al costado → va en `grupo`.
-- **Cazoleta+brazo (puerta):** giran con la puerta → van en un sub-grupo `bisP`
-  (hijo de `puertaPivot`) **pre-rotado `−ANGULO_ABIERTO`**. Así, al abrir la puerta
-  (`puertaPivot → ANGULO_ABIERTO`) la cazoleta coincide con la pletina (hinge montada),
-  y la cazoleta sigue metida en la puerta en todo el recorrido. El STL está en pose
-  **abierta**, por eso el estado ABIERTO es el de referencia (`M` = `BISAGRA_ROT`+`OFF`
-  se afina mirando la puerta abierta). Si faltan los STL → versión paramétrica.
+- **Pletina (casco):** fija al costado → `grupo`.
+- **Cazoleta:** gira con la puerta → en `bisP` (hijo de `puertaPivot`, pre-rotado
+  `−ANGULO_ABIERTO`). Al abrir coincide con la pletina; sigue metida en la puerta siempre.
+- **Brazo:** se **pliega**. Va en un grupo `fold` (hijo de `bisP`) cuyo eje vertical gira
+  `(1−t)·BIS_FOLD_ANG` con `t = anguloPuerta/ANGULO_ABIERTO` (t=1 abierta→extendido,
+  t=0 cerrada→plegado, recogiéndose hacia la cazoleta). Los grupos se guardan en
+  `bisagraFolds` y se animan por frame en el bucle.
+
+El STL está en pose **abierta**: el estado ABIERTO es el de referencia para afinar `M`
+(`BISAGRA_ROT`+`BISAGRA_OFF`); `BIS_FOLD_ANG`/`BIS_FOLD_PIV` afinan el plegado. Sin STL →
+versión paramétrica.
 
 - **Lado de bisagras = opuesto al tirador** (`HINGE_LADO`). Para "puerta izquierda"
   (tirador izq) → bisagras a la **derecha**.
