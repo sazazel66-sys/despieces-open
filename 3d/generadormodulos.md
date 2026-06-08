@@ -108,9 +108,35 @@ Ejemplo (60 × 70 × 58):
 - Se generan con `patasMueble(ancho, fondo, alto, inset=7.5, diam=5)` (color metal `#9a9da2`).
 - Soporte de geometría cilíndrica: pieza con `forma:"cilindro"` (eje Y, diámetro = `size[0]`, altura = `size[1]`).
 
-## 10. Pendiente (fase 2)
+## 10. Baldas (estantes)
 
-- Mecanizaciones (ranuras, taladros, cajeados, guías).
+Generadas con `baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda)`.
+
+- **Huecos iguales contando suelo y techo:** el interior `alto − 2·EC` se reparte en
+  `num + 1` tramos iguales. Cada línea divisoria es la **altura del porta-estante**
+  (mecanización): `yLínea(i) = EC + i · (alto − 2·EC)/(num+1)`, `i = 1..num`.
+  - Ejemplo 1 balda en bajo 70: `yLínea = 1,6 + 33,4 = 35 cm`.
+- **La balda apoya 0,5 cm por encima** de esa línea → la **cara inferior** de la balda
+  está en `yLínea + 0,5`. (`pos.y = yLínea + 0,5`).
+- **Espesor** de balda = `EC` (mismo tablero que el casco).
+- **Ancho** = `(ancho − 2·EC) − 0,3` (3 mm menos que suelo/techo), **centrada** a lo
+  ancho: `pos.x = EC + ((ancho−2·EC) − anchoBalda)/2`.
+- **Fondo** por defecto en **bajos = 50 cm**; va **apoyada en la trasera** (su cara
+  trasera toca la cara delantera de la trasera): `pos.z = traseraZ − fondoBalda`,
+  con `traseraZ = FONDO − T` (`T=5` bajos, `T=1,6` altos).
+- La balda **no** es frente: siempre visible aunque se oculte la puerta.
+
+## 11. Visibilidad de la puerta
+
+- Estado `puertaVisible` (bool) + botón `#btnPuerta` ("Puerta: visible" ⇄ "oculta").
+- Al ocultar, `poblarGrupo` filtra las piezas `frente:true` y omite sus tiradores
+  (`tiradores()`); el resto (carcasa, baldas, patas) se mantiene. Útil para ver el
+  interior y la colocación de baldas.
+
+## 12. Pendiente (fase 2)
+
+- Mecanizaciones (taladros porta-estantes como agujeros reales en los costados,
+  ranuras, cajeados, guías).
 - Cajones abiertos / interiores de cajón.
 - Auto-generar las imágenes PNG del catálogo desde el render.
 

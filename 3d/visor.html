@@ -19,13 +19,15 @@
   #medidas td{padding:1px 0}
   #medidas td.k{color:#889;padding-right:10px;white-space:nowrap}
   #medidas td.v{font-weight:600;text-align:right;white-space:nowrap}
-  /* Botón para alternar tipo de tirador */
-  #btnTirador{position:fixed;left:12px;bottom:34px;z-index:7;
+  /* Botones de la UI (alternar tirador / puerta) */
+  #btnTirador,#btnPuerta{position:fixed;left:12px;z-index:7;
     font:600 12px system-ui,sans-serif;color:#2b3340;
     background:rgba(255,255,255,.92);border:1px solid #c3c9d2;border-radius:7px;
     padding:8px 13px;cursor:pointer;box-shadow:0 1px 5px rgba(40,50,70,.15)}
-  #btnTirador:hover{background:#fff}
-  #btnTirador:active{transform:translateY(1px)}
+  #btnTirador{bottom:34px}
+  #btnPuerta{bottom:70px}
+  #btnTirador:hover,#btnPuerta:hover{background:#fff}
+  #btnTirador:active,#btnPuerta:active{transform:translateY(1px)}
 </style>
 <script type="importmap">
 {
@@ -41,6 +43,7 @@
 <div id="sub"></div>
 <div id="medidas"></div>
 <div id="hint">Arrastra para girar · pellizca para zoom · dos dedos para mover</div>
+<button id="btnPuerta">Puerta: visible</button>
 <button id="btnTirador">Tirador: uñero</button>
 <canvas id="c"></canvas>
 
@@ -62,6 +65,9 @@ const JUNTA_FRENTE = 0.2;
 // Mutable: el botón de la UI lo alterna y reconstruye la escena.
 let tipoTirador = "unero";
 
+// Visibilidad de la(s) puerta(s)/frente(s): el botón de la UI lo alterna.
+let puertaVisible = true;
+
 // ── Perfil uñero (falsa gola de aluminio a todo el ancho del frente) ─────────
 const UNERO_ALTO            = 2.7;  // alto nominal de la pala (referencia de colocación)
 const UNERO_RECORTE         = 3.6;  // cuánto se baja la zona trasera del frente para la gola
@@ -70,20 +76,25 @@ const UNERO_FRENTE_SALIENTE = 0.5;  // cuánto sube esa franja delantera sobre l
 const UNERO_PALA_ALTA       = 3.5;  // alto del lado derecho de la "J" (pala, al dorso)
 const UNERO_PALA_BAJA       = 0.7;  // alto del lado izquierdo de la "J" (labio, al frente)
 
+// ── Dimensiones del módulo (cm) ──────────────────────────────────────────────
+const ANCHO = 60, ALTO = 70, FONDO = 58;
+const EC = 1.6;                 // espesor casco (carcasa y baldas)
+const EP = 1.9;                 // espesor puerta
+const TRASERA = 5;              // trasera a 5 cm del fondo (bajos)
+const TRASERA_Z = FONDO - TRASERA;   // cara delantera de la trasera (z = 53)
+const NUM_BALDAS = 1;           // nº de baldas del módulo
+const FONDO_BALDA = 50;         // fondo de balda por defecto en bajos
+
 // Frentes (y0 = base, alto). `puerta:true` → tirador vertical en el lado de
 // apertura (`lado:"izq"|"der"` = lado del tirador). Si no, cajón (tirador horiz.).
-// Bajo de 5 cajones iguales: 70 cm / 5 = 14 cm cada uno.
+// Bajo de PUERTA IZQUIERDA: una sola puerta a todo el alto, tirador a la izquierda.
 const FRENTES = [
-  { y0:0,  alto:14 },
-  { y0:14, alto:14 },
-  { y0:28, alto:14 },
-  { y0:42, alto:14 },
-  { y0:56, alto:14 }
+  { y0:0, alto:ALTO, puerta:true, lado:"izq" }
 ];
 
 const MODELO = {
-  nombre: "Bajo 5 cajones",
-  nota: "5 cajones iguales (14 cm) · 60 × 70 × 58 cm",
+  nombre: "Bajo puerta izquierda",
+  nota: "1 puerta (izq) · 1 balda · 60 × 70 × 58 cm",
   color: "#d6d8db",          // gris claro tipo "vista sombreada" (Rhino)
   canto: "#3a3d42",          // aristas gris oscuro
   elevacion: 15.5,           // altura de patas: el cuerpo se sube esta cota
@@ -96,29 +107,47 @@ const MODELO = {
     ["Espesor casco",   "1,6 cm"],
     ["Espesor puerta",  "1,9 cm"],
     ["Trasera",         "a 5 cm del fondo"],
-    ["Cajones",         "5 × 14 cm"]
+    ["Baldas",          "1 · fondo 50 cm"],
+    ["Balda apoyo",     "+0,5 cm sobre porta-estante"]
     // (la fila del tirador se añade dinámicamente según tipoTirador)
   ],
   piezas: [
     // ── Caja (60 × 70 × 58, casco espesor 1,6) ────────────
-    { nombre:"Costado Izq", pos:[0,    0,    0], size:[1.6, 70, 58] },
-    { nombre:"Costado Der", pos:[58.4, 0,    0], size:[1.6, 70, 58] },
-    { nombre:"Suelo",       pos:[1.6,  0,    0], size:[56.8, 1.6, 58] },
-    { nombre:"Techo",       pos:[1.6,  68.4, 0], size:[56.8, 1.6, 58] },
+    { nombre:"Costado Izq", pos:[0,           0,        0], size:[EC, ALTO, FONDO] },
+    { nombre:"Costado Der", pos:[ANCHO-EC,    0,        0], size:[EC, ALTO, FONDO] },
+    { nombre:"Suelo",       pos:[EC,          0,        0], size:[ANCHO-2*EC, EC, FONDO] },
+    { nombre:"Techo",       pos:[EC,          ALTO-EC,  0], size:[ANCHO-2*EC, EC, FONDO] },
     // ── Trasera (encajada a 5 cm del fondo) ───────────────
-    { nombre:"Trasera",     pos:[1.6,  1.6,  53], size:[56.8, 66.8, 0.5] },
-    // ── 5 frentes de cajón iguales (cerrados, sobresalen 1,9 cm) ──
-    { nombre:"Frente cajón 1", frente:true, pos:[0.2, 0,  -1.9], size:[59.6, 14, 1.9] },
-    { nombre:"Frente cajón 2", frente:true, pos:[0.2, 14, -1.9], size:[59.6, 14, 1.9] },
-    { nombre:"Frente cajón 3", frente:true, pos:[0.2, 28, -1.9], size:[59.6, 14, 1.9] },
-    { nombre:"Frente cajón 4", frente:true, pos:[0.2, 42, -1.9], size:[59.6, 14, 1.9] },
-    { nombre:"Frente cajón 5", frente:true, pos:[0.2, 56, -1.9], size:[59.6, 14, 1.9] },
+    { nombre:"Trasera",     pos:[EC,          EC,  TRASERA_Z], size:[ANCHO-2*EC, ALTO-2*EC, 0.5] },
+    // ── Puerta izquierda (cerrada, sobresale 1,9 cm) ──────
+    { nombre:"Puerta", frente:true, pos:[0.2, 0, -EP], size:[ANCHO-0.4, ALTO, EP] },
+    // ── Baldas (huecos iguales; apoyan +0,5 cm sobre el porta-estante) ──
+    ...baldasMueble(NUM_BALDAS, ANCHO, ALTO, FONDO, EC, TRASERA_Z, FONDO_BALDA),
     // ── Patas (redondas regulables) ───────────────────────
     //    (los tiradores se añaden aparte en poblarGrupo, según tipoTirador)
     //    centro a 7,5 cm de cada borde (frente, trasera y laterales)
-    ...patasMueble(60, 58, 15.5)
+    ...patasMueble(ANCHO, FONDO, 15.5)
   ]
 };
+
+// ── Baldas ───────────────────────────────────────────────────────────────────
+// Reparte `num` baldas en huecos IGUALES contando suelo y techo: el interior
+// (alto − 2·EC) se divide en num+1 tramos. Cada línea divisoria es la altura del
+// PORTA-ESTANTE (mecanización). La balda APOYA 0,5 cm por encima de esa línea
+// (cara inferior de la balda en línea+0,5). Ancho = (interior) − 0,3 cm, centrada
+// a lo ancho. Fondo por defecto (bajos) = 50 cm, apoyada en la trasera.
+function baldasMueble(num, ancho, alto, fondo, ec, traseraZ, fondoBalda){
+  const out = [];
+  const anchoInt   = ancho - 2*ec;            // hueco entre costados
+  const anchoBalda = anchoInt - 0.3;          // 3 mm menos que suelo/techo
+  const x0    = ec + (anchoInt - anchoBalda)/2;   // centrada a lo ancho
+  const zBalda = traseraZ - fondoBalda;           // apoyada en la trasera
+  for (let i = 1; i <= num; i++){
+    const yLinea = ec + i * (alto - 2*ec) / (num + 1);   // porta-estante (hueco igual)
+    out.push({ nombre:"Balda", pos:[x0, yLinea + 0.5, zBalda], size:[anchoBalda, ec, fondoBalda] });
+  }
+  return out;
+}
 
 // Cuatro patas niveladoras de cocina (malla STL real); centro a `inset` cm.
 // Devuelve marcadores forma:"stl"; la malla se instancia en el bucle de piezas.
@@ -314,7 +343,10 @@ function poblarGrupo(){
   grupo.clear();
   grupo.position.set(0,0,0);
 
-  for (const p of [...MODELO.piezas, ...tiradores()]){
+  // Con la puerta oculta: se omiten frentes y sus tiradores (la balda sí se ve).
+  const piezas  = puertaVisible ? MODELO.piezas : MODELO.piezas.filter(p => !p.frente);
+  const tiros   = puertaVisible ? tiradores() : [];
+  for (const p of [...piezas, ...tiros]){
     const [sx,sy,sz] = p.size;
     const [px,py,pz] = p.pos;
     const oy = p.base ? 0 : elev;          // base:true (patas) no se elevan
@@ -433,6 +465,18 @@ btnTirador.addEventListener('click', () => {
   actualizarBoton();
 });
 actualizarBoton();
+
+// Botón: muestra/oculta la(s) puerta(s) y reconstruye la escena
+const btnPuerta = document.getElementById('btnPuerta');
+function actualizarBotonPuerta(){
+  btnPuerta.textContent = puertaVisible ? "Puerta: visible" : "Puerta: oculta";
+}
+btnPuerta.addEventListener('click', () => {
+  puertaVisible = !puertaVisible;
+  poblarGrupo();
+  actualizarBotonPuerta();
+});
+actualizarBotonPuerta();
 
 // Resize
 function resize(){
